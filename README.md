@@ -7,6 +7,42 @@ Playback and transcoding are deliberately delegated to [Plarr](https://github.co
 > [!IMPORTANT]
 > This repository currently contains a product and architecture specification only. There is no implementation yet. Nestrr's organized movie-library contract depends on [Chiprr issue #16: Add movie organization support](https://github.com/victor141516/chiprr/issues/16).
 
+## Visual direction
+
+The following mockups define the intended visual direction for the initial web application. They are implementation guides rather than exact pixel-level specifications: real metadata, artwork, responsive behavior, accessibility, and supported features remain authoritative over the illustrative content shown here.
+
+The interface should preserve these characteristics across catalog views:
+
+- a restrained, cinematic dark theme with clear content hierarchy;
+- coral primary actions, mint local-availability indicators, and subdued amber unavailable states;
+- an explicit distinction between shared filesystem availability and per-user playback progress or watched state;
+- compact navigation and integration health information that do not compete with catalog content;
+- readable, information-rich layouts that remain approachable rather than resembling a server administration dashboard.
+
+### Home and discovery
+
+The home view emphasizes discovery, continuing playback, and immediate recognition of titles already present in the shared library.
+
+![Nestrr home and discovery view](docs/images/home-discovery.png)
+
+### Movie details
+
+Movie details combine metadata, local availability, resume state, playback preferences, media-download actions, and related titles without obscuring the primary play action.
+
+![Nestrr movie detail view](docs/images/movie-detail.png)
+
+### Show and season details
+
+Show views keep aggregate availability separate from completion progress and make episode-level availability, watched state, and resume position scannable.
+
+![Nestrr show and season detail view](docs/images/show-detail.png)
+
+### Optional download initiation
+
+When Jackett and qBittorrent are configured, torrent search remains a focused, user-directed flow. Nestrr submits the selected result but does not become a download manager or duplicate qBittorrent's progress UI.
+
+![Nestrr Jackett search and qBittorrent submission view](docs/images/download-search.png)
+
 ## Goals
 
 - Provide a rich catalog for discovering movies, collections, shows, seasons, and episodes.
