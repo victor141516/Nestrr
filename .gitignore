@@ -1,0 +1,9 @@
+.env
+.runtime/
+data/
+web/node_modules/
+web/dist/
+*.tsbuildinfo
+*.db
+*.db-shm
+*.db-wal

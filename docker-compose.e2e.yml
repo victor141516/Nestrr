@@ -1,0 +1,166 @@
+name: ${NESTRR_E2E_PROJECT:-nestrr-e2e}
+
+services:
+  mock-tmdb:
+    image: nestrr-e2e-mocks:local
+    build:
+      context: .
+      dockerfile: e2e/mocks/Dockerfile
+    entrypoint: ["mocktmdb"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9090/stats"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+
+  mock-jackett:
+    image: nestrr-e2e-mocks:local
+    build:
+      context: .
+      dockerfile: e2e/mocks/Dockerfile
+    entrypoint: ["mockjackett"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9117/healthz"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+
+  mock-qbittorrent:
+    image: nestrr-e2e-mocks:local
+    build:
+      context: .
+      dockerfile: e2e/mocks/Dockerfile
+    entrypoint: ["mockqbittorrent"]
+    environment:
+      MOCK_QB_DELAY_SECONDS: "12"
+      MOCK_QB_DOWNLOAD_ROOT: /data/downloads
+    volumes:
+      - type: bind
+        source: ${NESTRR_E2E_RUNTIME}/data
+        target: /data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+
+  chiprr:
+    image: nestrr-e2e-chiprr:local
+    build:
+      context: ../chiprr
+    init: true
+    depends_on:
+      mock-tmdb:
+        condition: service_healthy
+    environment:
+      INPUT_DIRECTORY: /data/downloads/completed/Shows
+      SORTED_DIRECTORY: /data/library/Shows
+      MOVIE_INPUT_DIRECTORY: /data/downloads/completed/Movies
+      MOVIE_SORTED_DIRECTORY: /data/library/Movies
+      TMDB_TOKEN: e2e-token
+      TMDB_BASE_URL: http://mock-tmdb:9090/3
+      CACHE_FILE_PATH: /data/chiprr-cache/tmdb.jsonl
+      LOG_LEVEL: debug
+      MODE: watch
+      # Docker Desktop/WSL does not reliably forward inotify events between
+      # sibling containers sharing a Windows bind mount.
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "200"
+    volumes:
+      - type: bind
+        source: ${NESTRR_E2E_RUNTIME}/data
+        target: /data
+
+  plarr:
+    image: nestrr-e2e-plarr:local
+    build:
+      context: ../Plarr
+    environment:
+      PLARR_LISTEN_ADDR: :8090
+      PLARR_MEDIA_ROOT: /media
+      PLARR_PUBLIC_ORIGIN: http://plarr:8090
+      PLARR_ALLOWED_PARENT_ORIGINS: http://nestrr:8080
+      PLARR_CACHE_DIR: /cache
+      PLARR_HARDWARE_ACCELERATION: cpu
+      PLARR_LOG_LEVEL: debug
+    volumes:
+      - type: bind
+        source: ${NESTRR_E2E_RUNTIME}/data/library
+        target: /media
+        read_only: true
+      - type: bind
+        source: ${NESTRR_E2E_RUNTIME}/plarr-cache
+        target: /cache
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8090/healthz"]
+      interval: 1s
+      timeout: 2s
+      retries: 30
+
+  nestrr:
+    image: nestrr-e2e-nestrr:local
+    build:
+      context: .
+    depends_on:
+      mock-tmdb:
+        condition: service_healthy
+      mock-jackett:
+        condition: service_healthy
+      mock-qbittorrent:
+        condition: service_healthy
+      plarr:
+        condition: service_healthy
+    environment:
+      NESTRR_LISTEN_ADDR: :8080
+      NESTRR_DATABASE_PATH: /state/nestrr.db
+      NESTRR_IMAGE_CACHE_DIR: /state/images
+      NESTRR_MOVIE_LIBRARY_ROOT: /library/Movies
+      NESTRR_SHOW_LIBRARY_ROOT: /library/Shows
+      NESTRR_TMDB_BEARER_TOKEN: e2e-token
+      NESTRR_TMDB_BASE_URL: http://mock-tmdb:9090/3
+      NESTRR_TMDB_IMAGE_BASE_URL: http://mock-tmdb:9090/image
+      NESTRR_TMDB_CACHE_TTL: 1m
+      NESTRR_PLARR_HOST: http://plarr:8090
+      NESTRR_PLARR_INTERNAL_HOST: http://plarr:8090
+      NESTRR_JACKETT_HOST: http://mock-jackett:9117
+      NESTRR_JACKETT_API_KEY: e2e-key
+      NESTRR_QBITTORRENT_HOST: http://mock-qbittorrent:8080
+      NESTRR_QBITTORRENT_USERNAME: e2e-admin
+      NESTRR_QBITTORRENT_PASSWORD: e2e-password
+      NESTRR_QBITTORRENT_MOVIE_CATEGORY: Movies
+      NESTRR_QBITTORRENT_SHOW_CATEGORY: Shows
+      NESTRR_JWT_SECRET: e2e-only-jwt-secret-at-least-thirty-two-characters
+      NESTRR_PUBLIC_ORIGIN: http://nestrr:8080
+      NESTRR_LOG_LEVEL: debug
+    volumes:
+      - type: bind
+        source: ${NESTRR_E2E_RUNTIME}/nestrr-state
+        target: /state
+      - type: bind
+        source: ${NESTRR_E2E_RUNTIME}/data/library
+        target: /library
+        read_only: true
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 1s
+      timeout: 2s
+      retries: 30
+
+  e2e:
+    image: nestrr-e2e-runner:local
+    build:
+      context: e2e/runner
+    depends_on:
+      chiprr:
+        condition: service_started
+      nestrr:
+        condition: service_healthy
+    environment:
+      NESTRR_URL: http://nestrr:8080
+      JACKETT_MOCK_URL: http://mock-jackett:9117
+      QBITTORRENT_MOCK_URL: http://mock-qbittorrent:8080
+    volumes:
+      - type: bind
+        source: ${NESTRR_E2E_RUNTIME}
+        target: /runtime
+    shm_size: 1gb

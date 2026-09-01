@@ -4,8 +4,23 @@ Nestrr is a self-hosted movie and TV catalog designed as a focused alternative t
 
 Playback and transcoding are deliberately delegated to [Plarr](https://github.com/victor141516/Plarr), a separate standalone web player. Downloaded files are normalized by [Chiprr](https://github.com/victor141516/chiprr), which remains independent from both Nestrr and Plarr.
 
-> [!IMPORTANT]
-> This repository currently contains a product and architecture specification only. There is no implementation yet. Nestrr's organized movie-library contract depends on [Chiprr issue #16: Add movie organization support](https://github.com/victor141516/chiprr/issues/16).
+## Quick start
+
+Copy `.env.example` to `.env`, configure the required secrets and TMDB token, then start the stack.
+
+CPU-only host:
+
+```powershell
+docker compose up -d --build
+```
+
+NVIDIA host, including Docker Desktop with WSL:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.nvidia.yml up -d --build
+```
+
+Always include `docker-compose.nvidia.yml` when recreating the stack on an NVIDIA host. Starting only the base file removes Plarr's GPU request and forces transcoding onto the CPU. See [DEPLOYMENT.md](DEPLOYMENT.md) for storage, reverse proxy, qBittorrent, Jackett, FlareSolverr, security, and recovery details.
 
 ## Visual direction
 
@@ -19,9 +34,9 @@ The interface should preserve these characteristics across catalog views:
 - compact navigation and integration health information that do not compete with catalog content;
 - readable, information-rich layouts that remain approachable rather than resembling a server administration dashboard.
 
-### Home and discovery
+### Explore
 
-The home view emphasizes discovery, continuing playback, and immediate recognition of titles already present in the shared library.
+The Explore view combines continuing playback, search, filters, and discovery in one place.
 
 ![Nestrr home and discovery view](docs/images/home-discovery.png)
 
@@ -177,6 +192,7 @@ The required form is:
 - Anime absolute numbering is not resolved.
 - Specials and season zero are not resolved.
 - Every supported show episode has a positive season number and a positive episode number.
+- Movies with the same canonical English title and release year share one filesystem stem because filenames do not contain a TMDB ID. A single file can therefore appear available on more than one TMDB movie page; this is a known limitation.
 - If more than one supported extension exists for the same canonical stem, Nestrr selects the same one deterministically by sorting candidate paths alphabetically and taking the first. This is considered a library-owner problem rather than a catalog error.
 
 ## Nestrr catalog
@@ -235,6 +251,10 @@ Refresh semantics are hierarchical but intentionally conservative:
 - Every user selects their own language.
 - The administrator cannot set a language for all users.
 - The selected language is sent to TMDB for that user's metadata requests.
+- Filesystem paths never use localized metadata. Movies, shows, and episodes
+  are always resolved with their canonical English TMDB title.
+- Before a user has selected an audio track for an item, the primary language
+  subtag from this setting is sent to Plarr as the preferred audio language.
 - English and Spanish have translated Nestrr interfaces initially.
 - If a user selects Portuguese or another unsupported UI language, the interface falls back to English while TMDB metadata is requested in the selected language.
 
@@ -257,6 +277,11 @@ No personalized ranking algorithm is required initially.
 ## Filesystem availability
 
 The organized library is shared by every user. Watch progress, watched state, metadata language, and playback preferences are per user; the underlying files are not.
+
+Browser sessions use a two-hour access token. While Nestrr remains visible, the
+web client renews it shortly before expiration using the rotating HttpOnly
+refresh cookie. A rejected request still triggers one reactive refresh and
+retry as a fallback. Hidden tabs wait until they become visible again.
 
 The filesystem is authoritative. Database availability is only an acceleration structure.
 
@@ -355,13 +380,13 @@ Although Plarr is implemented in its own repository, these requirements define N
 Initial video ladder (provisional defaults, configurable before implementation is finalized):
 
 | Label | Maximum height | Target video bitrate |
-| --- | ---: | ---: |
-| 2160p | 2160 | 16 Mbps |
-| 1080p | 1080 | 8 Mbps |
-| 720p | 720 | 5 Mbps |
-| 480p | 480 | 2.5 Mbps |
-| 360p | 360 | 1 Mbps |
-| 240p | 240 | 500 Kbps |
+| ----- | -------------: | -------------------: |
+| 2160p |           2160 |              16 Mbps |
+| 1080p |           1080 |               8 Mbps |
+| 720p  |            720 |               5 Mbps |
+| 480p  |            480 |             2.5 Mbps |
+| 360p  |            360 |               1 Mbps |
+| 240p  |            240 |             500 Kbps |
 
 Never upscale above the source. Preserve aspect ratio. Audio bitrate/profile must be selected separately and remain broadly browser-compatible.
 
@@ -497,15 +522,17 @@ Store at least:
 - preferred audio language and optional track title;
 - preferred subtitle language and optional track title;
 - subtitle enabled state.
+- whether the initial playback threshold has been reached and when.
 
 Rules:
 
 - Resume five seconds before the last stored position, clamped to zero.
-- Mark an item watched when playback reaches the actual end.
-- Also mark it watched when position reaches at least 95% and the user requests/accepts the next item.
-- Do not infer watched state merely from an arbitrary seek past 95% without completion or next navigation.
-- Movies and episodes both retain a watched marker.
-- Show and season progress is derived from their episodes.
+- Do not create visible progress until 30 seconds of actual playback have accumulated since the latest seek. Paused time and a suspended tab do not count; seeking resets this initial gate.
+- Once visible progress exists, save subsequent position changes immediately without requiring another 30-second gate.
+- Complete an item at 95% of its duration. Completion adds a movie, or a series whose released episodes (including specials) are all complete, to the Watched list and removes it from Watch Later.
+- Manual membership in Watched is independent of playback progress and does not remove Watch Later.
+- Movies and episodes retain playback completion; show and season completion is derived from episodes.
+- Episodes can be marked complete individually, and a season action completes all its episodes.
 - Resolution/quality selection is never restored between sessions.
 - A killed browser may lose at most the progress since the most recent successfully ingested heartbeat.
 
@@ -644,6 +671,7 @@ Exact names may change before implementation, but the initial environment contra
 - show library root;
 - TMDB bearer token;
 - raw TMDB request-cache TTL;
+- MDBList and OMDb API keys for optional Rotten Tomatoes ratings;
 - Plarr host (optional);
 - Jackett host and credentials/API key (optional);
 - qBittorrent host and credentials (optional);
@@ -666,19 +694,20 @@ Exact names may change before implementation, but the initial environment contra
 
 ## Data ownership summary
 
-| Data | Owner | Scope | Lifetime |
-| --- | --- | --- | --- |
-| Raw TMDB HTTP responses | Nestrr | Request key | Short TTL |
-| Detail metadata JSON | Nestrr | User + language + item | Infinite until manual refresh/delete |
-| Cached artwork | Nestrr | Metadata entry/asset | Until corresponding cleanup |
-| Availability index | Nestrr | Shared library item | Advisory; filesystem revalidated |
-| Original media files | qBittorrent/operator | Shared host | Operator-controlled |
-| Canonical hard links | Chiprr/operator | Shared library | Operator-controlled |
-| Watch progress/state | Nestrr | User + catalog item | Persistent |
-| Audio/subtitle preference | Nestrr | User + catalog item | Persistent |
-| Playback resolution | Plarr session | Session | Not persisted |
-| HLS/transcode segments | Plarr | Media/rendition cache | Startup clear or LRU eviction |
-| Torrent info-hash association | Nestrr | Catalog item | Persistent |
+| Data                          | Owner                | Scope                  | Lifetime                             |
+| ----------------------------- | -------------------- | ---------------------- | ------------------------------------ |
+| Raw TMDB HTTP responses       | Nestrr               | Request key            | Short TTL                            |
+| Detail metadata JSON          | Nestrr               | User + language + item | Infinite until manual refresh/delete |
+| Rotten Tomatoes rating        | Nestrr               | Shared catalog item    | Infinite until manual refresh         |
+| Cached artwork                | Nestrr               | Metadata entry/asset   | Until corresponding cleanup          |
+| Availability index            | Nestrr               | Shared library item    | Advisory; filesystem revalidated     |
+| Original media files          | qBittorrent/operator | Shared host            | Operator-controlled                  |
+| Canonical hard links          | Chiprr/operator      | Shared library         | Operator-controlled                  |
+| Watch progress/state          | Nestrr               | User + catalog item    | Persistent                           |
+| Audio/subtitle preference     | Nestrr               | User + catalog item    | Persistent                           |
+| Playback resolution           | Plarr session        | Session                | Not persisted                        |
+| HLS/transcode segments        | Plarr                | Media/rendition cache  | Startup clear or LRU eviction        |
+| Torrent info-hash association | Nestrr               | Catalog item           | Persistent                           |
 
 ## Delivery plan
 
@@ -786,8 +815,24 @@ Before an implementation release, deployment documentation must explain:
 - [x] Plarr repository reserved.
 - [x] Nestrr repository reserved.
 - [x] Chiprr movie-support issue specified: [#16](https://github.com/victor141516/chiprr/issues/16).
-- [ ] Chiprr movie support implemented.
-- [ ] Backend language/database decisions finalized.
-- [ ] API contracts finalized.
-- [ ] Plarr implementation started.
-- [ ] Nestrr implementation started.
+- [x] Chiprr movie support implemented and validated from PR #17.
+- [x] Go backends and SQLite migrations finalized.
+- [x] Versioned Nestrr, Plarr, and iframe contracts implemented and documented.
+- [x] Plarr implementation completed for the initial scope.
+- [x] Nestrr implementation completed for the initial scope.
+
+Deployment, security, GPU, storage, backup, recovery, and limitation details are in [DEPLOYMENT.md](DEPLOYMENT.md). Versioned client contracts are summarized in [docs/API.md](docs/API.md).
+
+## Real isolated end-to-end test
+
+From Windows PowerShell with Docker Desktop/WSL running:
+
+```powershell
+.\scripts\e2e.ps1
+```
+
+The launcher creates a unique directory under the system temporary directory and bind-mounts every runtime volume from it. It starts fresh Nestrr, Chiprr, and Plarr containers plus separate mock TMDB, Jackett, and qBittorrent containers; it exposes no host ports and configures Plarr with CPU acceleration only.
+
+The Chromium runner bootstraps Nestrr, renders three mock movies, searches Jackett, submits the selected magnet to qBittorrent, and waits while that mock generates a real eight-second VP9/Opus WebM with FFmpeg. It then verifies that Chiprr created a canonical hardlink, that Nestrr lists the movie as downloaded, and that Plarr's video has valid dimensions and duration and advances past 1.5 seconds while playing.
+
+Successful runs remove their temporary runtime automatically. Failed runs preserve it for diagnosis; pass `-KeepRuntime` to preserve a successful run and its `artifacts/playback.png` screenshot too. Once the images have been built, `-NoBuild` skips rebuilding them.

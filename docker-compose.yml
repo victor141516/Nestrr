@@ -1,0 +1,145 @@
+name: nestrr
+
+services:
+  nestrr:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      plarr: { condition: service_healthy }
+      jackett: { condition: service_healthy }
+      qbittorrent: { condition: service_started }
+    environment:
+      NESTRR_LISTEN_ADDR: :8080
+      NESTRR_DATABASE_PATH: /data/nestrr.db
+      NESTRR_IMAGE_CACHE_DIR: /cache/images
+      NESTRR_KEYWORD_CACHE_PATH: /data/tmdb-keywords.json.gz
+      NESTRR_MOVIE_LIBRARY_ROOT: /library/Movies
+      NESTRR_SHOW_LIBRARY_ROOT: /library/Shows
+      NESTRR_TMDB_BEARER_TOKEN: ${TMDB_TOKEN:?Set TMDB_TOKEN in .env}
+      NESTRR_TMDB_CACHE_TTL: ${TMDB_CACHE_TTL:-1h}
+      NESTRR_MDBLIST_API_KEY: ${MDBLIST_API_KEY:-}
+      NESTRR_OMDB_API_KEY: ${OMDB_API_KEY:-}
+      NESTRR_PLARR_HOST: ${PLARR_PUBLIC_ORIGIN:-http://localhost:8090}
+      NESTRR_PLARR_INTERNAL_HOST: http://plarr:8090
+      NESTRR_JACKETT_HOST: http://jackett:9117
+      NESTRR_JACKETT_API_KEY: ${JACKETT_API_KEY:-}
+      NESTRR_QBITTORRENT_HOST: http://qbittorrent:8444
+      NESTRR_QBITTORRENT_USERNAME: ${QBITTORRENT_USERNAME:-admin}
+      NESTRR_QBITTORRENT_PASSWORD: ${QBITTORRENT_PASSWORD:-}
+      NESTRR_QBITTORRENT_SHOW_CATEGORY: ${QBITTORRENT_SHOW_CATEGORY:-Shows}
+      NESTRR_QBITTORRENT_MOVIE_CATEGORY: ${QBITTORRENT_MOVIE_CATEGORY:-Movies}
+      NESTRR_JWT_SECRET: ${NESTRR_JWT_SECRET:?Set a random NESTRR_JWT_SECRET of at least 32 characters}
+      NESTRR_PUBLIC_ORIGIN: ${NESTRR_PUBLIC_ORIGIN:-http://localhost:8080}
+    ports: ["8080:8080"]
+    volumes:
+      # SQLite WAL must live on the Linux filesystem. A Windows bind mount
+      # through Docker Desktop/WSL can corrupt SQLite's locking metadata.
+      - nestrr-data:/data
+      - ./.runtime/images:/cache/images
+      - ./.runtime/data/library/Movies:/library/Movies:ro
+      - ./.runtime/data/library/Shows:/library/Shows:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  plarr:
+    build: ../Plarr
+    restart: unless-stopped
+    cpus: ${PLARR_CPU_LIMIT:-4.0}
+    environment:
+      PLARR_LISTEN_ADDR: :8090
+      PLARR_MEDIA_ROOT: /media
+      PLARR_PUBLIC_ORIGIN: ${PLARR_PUBLIC_ORIGIN:-http://localhost:8090}
+      PLARR_ALLOWED_PARENT_ORIGINS: ${NESTRR_PUBLIC_ORIGIN:-http://localhost:8080}
+      PLARR_CACHE_DIR: /cache
+      PLARR_CACHE_LIMIT: ${PLARR_CACHE_LIMIT:-10GB}
+      PLARR_HARDWARE_ACCELERATION: ${PLARR_HARDWARE_ACCELERATION:-auto}
+    ports: ["8090:8090"]
+    volumes:
+      - ./.runtime/data/library:/media:ro
+      - ./.runtime/plarr-cache:/cache
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8090/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  jackett:
+    image: lscr.io/linuxserver/jackett:latest
+    restart: unless-stopped
+    depends_on:
+      flaresolverr: { condition: service_healthy }
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-Europe/Madrid}
+      AUTO_UPDATE: "true"
+    ports: ["19117:9117"]
+    volumes:
+      - ./.runtime/jackett:/config
+      - ./.runtime/data/downloads:/downloads
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9117/UI/Dashboard"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    restart: unless-stopped
+    environment:
+      LOG_LEVEL: ${FLARESOLVERR_LOG_LEVEL:-info}
+      LOG_FILE: none
+      LOG_HTML: "false"
+      CAPTCHA_SOLVER: none
+      TZ: ${TZ:-Europe/Madrid}
+    volumes:
+      - ./.runtime/flaresolverr:/config
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8191/', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 12
+      start_period: 20s
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-Europe/Madrid}
+      # Match the tailnet HTTPS port so qBittorrent can keep Host validation enabled.
+      WEBUI_PORT: 8444
+      TORRENTING_PORT: 6881
+    ports:
+      # Local-only WebUI; publish it to the tailnet with Tailscale Serve.
+      - "127.0.0.1:8085:8444"
+      - "6881:6881"
+      - "6881:6881/udp"
+    volumes:
+      - ./.runtime/qbittorrent:/config
+      - ./.runtime/data/downloads:/downloads
+
+  chiprr:
+    build: ../chiprr
+    restart: unless-stopped
+    environment:
+      INPUT_DIRECTORY: /data/downloads/completed/Shows
+      SORTED_DIRECTORY: /data/library/Shows
+      MOVIE_INPUT_DIRECTORY: /data/downloads/completed/Movies
+      MOVIE_SORTED_DIRECTORY: /data/library/Movies
+      TMDB_TOKEN: ${TMDB_TOKEN:?Set TMDB_TOKEN in .env}
+      CACHE_FILE_PATH: /cache/tmdb-cache.jsonl
+      REPLACE_IF_EXISTS: "false"
+      LOG_LEVEL: info
+    volumes:
+      # A single mount is deliberate: Chiprr hard links must stay on one filesystem.
+      - ./.runtime/data:/data
+      - ./.runtime/chiprr-cache:/cache
+
+volumes:
+  nestrr-data:
+    name: nestrr-data

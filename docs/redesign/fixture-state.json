@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "titles": {
+    "blind-orbit": {
+      "displayTitle": "Órbita Ciega",
+      "canonicalTitle": "Blind Orbit",
+      "year": 2026,
+      "path": "Movies/Blind Orbit (2026)/Blind Orbit (2026).mkv",
+      "states": ["remote", "torrent-accepted", "organized", "available"],
+      "progressAfterAvailable": 42
+    },
+    "threshold-harbor": {
+      "displayTitle": "Puerto Umbral",
+      "canonicalTitle": "Threshold Harbor",
+      "availability": { "available": 5, "total": 8 },
+      "watched": { "watched": 3, "total": 8 },
+      "episodes": {
+        "S01E01": "available-watched",
+        "S01E02": "available-progress",
+        "S01E03": "remote",
+        "S01E05": "available-watched",
+        "S01E06": "available-next"
+      },
+      "libraryPath": "Series/Threshold Harbor/Season 01/Threshold Harbor - S01E02.mkv",
+      "autoplay": { "from": "S01E05", "to": "S01E06" }
+    }
+  },
+  "serviceRules": {
+    "plarr-down": { "play": false, "download": false, "torrent": true, "metadata": true },
+    "jackett-down": { "play": true, "download": true, "torrent": false, "metadata": true },
+    "qbittorrent-down": { "play": true, "download": true, "torrent": false, "metadata": true }
+  },
+  "mobileShell": {
+    "primaryNavigation": ["Inicio", "Buscar", "Descargado"],
+    "serviceStatusPattern": "secondary-panel"
+  }
+}

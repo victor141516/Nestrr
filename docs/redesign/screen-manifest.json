@@ -1,0 +1,1656 @@
+{
+  "version": 3,
+  "assetRoot": "assets/screens",
+  "screens": [
+    {
+      "id": "S00",
+      "title": "Carga inicial",
+      "file": "assets/screens/s00-loading.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Inicialización de sesión y servicios.",
+      "hotspotSuggestions": [
+        {
+          "action": "Continuar a primera ejecución",
+          "target": "S01",
+          "regionHint": "indicador central"
+        },
+        {
+          "action": "Continuar a login",
+          "target": "S02",
+          "regionHint": "indicador central"
+        },
+        {
+          "action": "Continuar con sesión",
+          "target": "S03",
+          "regionHint": "indicador central"
+        }
+      ]
+    },
+    {
+      "id": "S01",
+      "title": "Crear administrador · listo",
+      "file": "assets/screens/s01-bootstrap.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Formulario limpio de primera ejecución.",
+      "hotspotSuggestions": [
+        {
+          "action": "Crear administrador",
+          "target": "S01-loading",
+          "regionHint": "botón Crear administrador"
+        }
+      ]
+    },
+    {
+      "id": "S01-mobile",
+      "title": "Crear administrador · listo · móvil",
+      "file": "assets/screens/s01-bootstrap-mobile.png",
+      "width": 836,
+      "height": 1882,
+      "description": "Formulario móvil limpio de primera ejecución.",
+      "hotspotSuggestions": [
+        {
+          "action": "Crear administrador",
+          "target": "S01-loading-mobile",
+          "regionHint": "botón Crear administrador"
+        }
+      ],
+      "variantOf": "S01"
+    },
+    {
+      "id": "S01-loading",
+      "title": "Crear administrador · enviando",
+      "file": "assets/screens/s01-bootstrap-loading.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Envío bloqueado mientras se crea el administrador.",
+      "hotspotSuggestions": [
+        {
+          "action": "Creación completada",
+          "target": "S03",
+          "regionHint": "botón en progreso"
+        }
+      ],
+      "variantOf": "S01"
+    },
+    {
+      "id": "S01-loading-mobile",
+      "title": "Crear administrador · enviando · móvil",
+      "file": "assets/screens/s01-bootstrap-loading-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Envío móvil bloqueado mientras se crea el administrador.",
+      "hotspotSuggestions": [
+        {
+          "action": "Creación completada",
+          "target": "S03-mobile",
+          "regionHint": "botón en progreso"
+        }
+      ],
+      "variantOf": "S01"
+    },
+    {
+      "id": "S01-error",
+      "title": "Crear administrador · conflicto",
+      "file": "assets/screens/s01-bootstrap-error.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Conflicto seguro porque la primera cuenta ya existe.",
+      "hotspotSuggestions": [
+        {
+          "action": "Ir a iniciar sesión",
+          "target": "S02",
+          "regionHint": "botón Ir a iniciar sesión"
+        }
+      ],
+      "variantOf": "S01"
+    },
+    {
+      "id": "S01-error-mobile",
+      "title": "Crear administrador · conflicto · móvil",
+      "file": "assets/screens/s01-bootstrap-error-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Conflicto móvil seguro porque la primera cuenta ya existe.",
+      "hotspotSuggestions": [
+        {
+          "action": "Ir a iniciar sesión",
+          "target": "S02-mobile",
+          "regionHint": "botón Ir a iniciar sesión"
+        }
+      ],
+      "variantOf": "S01"
+    },
+    {
+      "id": "S02",
+      "title": "Iniciar sesión · listo",
+      "file": "assets/screens/s02-login.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Formulario de acceso listo.",
+      "hotspotSuggestions": [
+        {
+          "action": "Iniciar sesión",
+          "target": "S02-loading",
+          "regionHint": "botón Iniciar sesión"
+        }
+      ]
+    },
+    {
+      "id": "S02-mobile",
+      "title": "Iniciar sesión · listo · móvil",
+      "file": "assets/screens/s02-login-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Formulario móvil de acceso listo.",
+      "hotspotSuggestions": [
+        {
+          "action": "Iniciar sesión",
+          "target": "S02-loading-mobile",
+          "regionHint": "botón Iniciar sesión"
+        }
+      ],
+      "variantOf": "S02"
+    },
+    {
+      "id": "S02-loading",
+      "title": "Iniciar sesión · enviando",
+      "file": "assets/screens/s02-login-loading.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Credenciales en validación.",
+      "hotspotSuggestions": [
+        {
+          "action": "Acceso completado",
+          "target": "S03",
+          "regionHint": "botón en progreso"
+        }
+      ],
+      "variantOf": "S02"
+    },
+    {
+      "id": "S02-loading-mobile",
+      "title": "Iniciar sesión · enviando · móvil",
+      "file": "assets/screens/s02-login-loading-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Credenciales móviles en validación.",
+      "hotspotSuggestions": [
+        {
+          "action": "Acceso completado",
+          "target": "S03-mobile",
+          "regionHint": "botón en progreso"
+        }
+      ],
+      "variantOf": "S02"
+    },
+    {
+      "id": "S02-error",
+      "title": "Iniciar sesión · error",
+      "file": "assets/screens/s02-login-error.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Credenciales incorrectas sin estado de carga simultáneo.",
+      "hotspotSuggestions": [
+        {
+          "action": "Reintentar",
+          "target": "S02-loading",
+          "regionHint": "botón Iniciar sesión"
+        }
+      ],
+      "variantOf": "S02"
+    },
+    {
+      "id": "S02-error-mobile",
+      "title": "Iniciar sesión · error · móvil",
+      "file": "assets/screens/s02-login-error-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Credenciales incorrectas en móvil.",
+      "hotspotSuggestions": [
+        {
+          "action": "Reintentar",
+          "target": "S02-loading-mobile",
+          "regionHint": "botón Iniciar sesión"
+        }
+      ],
+      "variantOf": "S02"
+    },
+    {
+      "id": "S03",
+      "title": "Inicio",
+      "file": "assets/screens/s03-home.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Inicio con catálogo, seguir viendo y disponibilidad explícita.",
+      "hotspotSuggestions": [
+        {
+          "action": "Abrir Órbita Ciega",
+          "target": "S06",
+          "regionHint": "hero"
+        },
+        {
+          "action": "Abrir Puerto Umbral",
+          "target": "S07",
+          "regionHint": "tarjeta Puerto Umbral"
+        },
+        {
+          "action": "Buscar",
+          "target": "S04-ready",
+          "regionHint": "nav Buscar"
+        },
+        {
+          "action": "Descargado",
+          "target": "S05",
+          "regionHint": "nav Descargado"
+        },
+        {
+          "action": "Ajustes",
+          "target": "S12",
+          "regionHint": "avatar"
+        }
+      ]
+    },
+    {
+      "id": "S03-mobile",
+      "title": "Inicio · móvil",
+      "file": "assets/screens/s03-home-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Inicio móvil con avatar visible y shell consistente.",
+      "hotspotSuggestions": [
+        {
+          "action": "Abrir Órbita Ciega",
+          "target": "S06-mobile",
+          "regionHint": "hero"
+        },
+        {
+          "action": "Abrir Puerto Umbral",
+          "target": "S07-mobile",
+          "regionHint": "tarjeta Puerto Umbral"
+        },
+        {
+          "action": "Buscar",
+          "target": "S04-ready-mobile",
+          "regionHint": "nav Buscar"
+        },
+        {
+          "action": "Descargado",
+          "target": "S05-mobile",
+          "regionHint": "nav Descargado"
+        },
+        {
+          "action": "Ajustes",
+          "target": "S12-mobile",
+          "regionHint": "avatar"
+        }
+      ],
+      "variantOf": "S03"
+    },
+    {
+      "id": "S04",
+      "title": "Buscar · resultados",
+      "file": "assets/screens/s04-search.png",
+      "width": 1671,
+      "height": 941,
+      "description": "Resultados estables para órbita; Órbita Ciega remota y servicios sanos.",
+      "hotspotSuggestions": [
+        {
+          "action": "Abrir Órbita Ciega",
+          "target": "S06-remote",
+          "regionHint": "tarjeta Órbita Ciega"
+        },
+        {
+          "action": "Abrir Puerto Umbral",
+          "target": "S07",
+          "regionHint": "tarjeta Puerto Umbral"
+        },
+        {
+          "action": "Nueva búsqueda",
+          "target": "S04-loading",
+          "regionHint": "botón Buscar"
+        }
+      ]
+    },
+    {
+      "id": "S04-mobile",
+      "title": "Buscar · resultados · móvil",
+      "file": "assets/screens/s04-search-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Resultados móviles estables para órbita.",
+      "hotspotSuggestions": [
+        {
+          "action": "Abrir Órbita Ciega",
+          "target": "S06-remote-mobile",
+          "regionHint": "tarjeta Órbita Ciega"
+        },
+        {
+          "action": "Abrir Puerto Umbral",
+          "target": "S07-mobile",
+          "regionHint": "tarjeta Puerto Umbral"
+        },
+        {
+          "action": "Nueva búsqueda",
+          "target": "S04-loading-mobile",
+          "regionHint": "botón Buscar"
+        }
+      ],
+      "variantOf": "S04"
+    },
+    {
+      "id": "S04-ready",
+      "title": "Buscar · listo",
+      "file": "assets/screens/s04-search-ready.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Buscador antes de ejecutar una consulta.",
+      "hotspotSuggestions": [
+        {
+          "action": "Buscar",
+          "target": "S04-loading",
+          "regionHint": "botón Buscar"
+        }
+      ],
+      "variantOf": "S04"
+    },
+    {
+      "id": "S04-ready-mobile",
+      "title": "Buscar · listo · móvil",
+      "file": "assets/screens/s04-search-ready-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Buscador móvil antes de ejecutar una consulta.",
+      "hotspotSuggestions": [
+        {
+          "action": "Buscar",
+          "target": "S04-loading-mobile",
+          "regionHint": "botón Buscar"
+        }
+      ],
+      "variantOf": "S04"
+    },
+    {
+      "id": "S04-loading",
+      "title": "Buscar · cargando",
+      "file": "assets/screens/s04-search-loading.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Consulta TMDB en curso sin resultados simultáneos.",
+      "hotspotSuggestions": [
+        {
+          "action": "Resultados recibidos",
+          "target": "S04",
+          "regionHint": "indicador Buscando"
+        }
+      ],
+      "variantOf": "S04"
+    },
+    {
+      "id": "S04-loading-mobile",
+      "title": "Buscar · cargando · móvil",
+      "file": "assets/screens/s04-search-loading-mobile.png",
+      "width": 852,
+      "height": 1846,
+      "description": "Consulta TMDB móvil en curso.",
+      "hotspotSuggestions": [
+        {
+          "action": "Resultados recibidos",
+          "target": "S04-mobile",
+          "regionHint": "indicador Buscando"
+        }
+      ],
+      "variantOf": "S04"
+    },
+    {
+      "id": "S04-empty",
+      "title": "Buscar · sin resultados",
+      "file": "assets/screens/s04-search-empty.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Consulta completada sin coincidencias.",
+      "hotspotSuggestions": [
+        {
+          "action": "Cambiar búsqueda",
+          "target": "S04-ready",
+          "regionHint": "campo de búsqueda"
+        }
+      ],
+      "variantOf": "S04"
+    },
+    {
+      "id": "S04-empty-mobile",
+      "title": "Buscar · sin resultados · móvil",
+      "file": "assets/screens/s04-search-empty-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Consulta móvil completada sin coincidencias.",
+      "hotspotSuggestions": [
+        {
+          "action": "Cambiar búsqueda",
+          "target": "S04-ready-mobile",
+          "regionHint": "campo de búsqueda"
+        }
+      ],
+      "variantOf": "S04"
+    },
+    {
+      "id": "S04-error",
+      "title": "Buscar · error",
+      "file": "assets/screens/s04-search-error.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Fallo de TMDB con recuperación explícita.",
+      "hotspotSuggestions": [
+        {
+          "action": "Reintentar",
+          "target": "S04-loading",
+          "regionHint": "botón Reintentar"
+        }
+      ],
+      "variantOf": "S04"
+    },
+    {
+      "id": "S04-error-mobile",
+      "title": "Buscar · error · móvil",
+      "file": "assets/screens/s04-search-error-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Fallo móvil de TMDB con recuperación explícita.",
+      "hotspotSuggestions": [
+        {
+          "action": "Reintentar",
+          "target": "S04-loading-mobile",
+          "regionHint": "botón Reintentar"
+        }
+      ],
+      "variantOf": "S04"
+    },
+    {
+      "id": "S05",
+      "title": "Descargado",
+      "file": "assets/screens/s05-library.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Biblioteca física; Puerto Umbral S01E02 conserva 38 % y 18:32.",
+      "hotspotSuggestions": [
+        {
+          "action": "Abrir Órbita Ciega",
+          "target": "S06",
+          "regionHint": "fila Órbita Ciega"
+        },
+        {
+          "action": "Reanudar S01E02",
+          "target": "S09-episode",
+          "regionHint": "fila Puerto Umbral S01E02"
+        },
+        {
+          "action": "Reenumerar",
+          "target": "S05",
+          "regionHint": "botón actualizar"
+        }
+      ]
+    },
+    {
+      "id": "S05-mobile",
+      "title": "Descargado · móvil",
+      "file": "assets/screens/s05-library-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Biblioteca móvil con rutas inglesas y progreso de E02.",
+      "hotspotSuggestions": [
+        {
+          "action": "Abrir Órbita Ciega",
+          "target": "S06-mobile",
+          "regionHint": "tarjeta Órbita Ciega"
+        },
+        {
+          "action": "Reanudar S01E02",
+          "target": "S09-episode-mobile",
+          "regionHint": "tarjeta Puerto Umbral S01E02"
+        }
+      ],
+      "variantOf": "S05"
+    },
+    {
+      "id": "S06",
+      "title": "Detalle película · disponible",
+      "file": "assets/screens/s06-movie.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Órbita Ciega disponible en disco con reproducción y descarga.",
+      "hotspotSuggestions": [
+        {
+          "action": "Reanudar",
+          "target": "S09",
+          "regionHint": "botón Reanudar"
+        },
+        {
+          "action": "Buscar torrent",
+          "target": "S11-ready",
+          "regionHint": "botón Buscar torrent"
+        },
+        {
+          "action": "Volver",
+          "target": "S03",
+          "regionHint": "nav Inicio"
+        }
+      ]
+    },
+    {
+      "id": "S06-mobile",
+      "title": "Detalle película · disponible · móvil",
+      "file": "assets/screens/s06-movie-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Órbita Ciega disponible en móvil.",
+      "hotspotSuggestions": [
+        {
+          "action": "Reanudar",
+          "target": "S09-mobile",
+          "regionHint": "botón Reanudar"
+        },
+        {
+          "action": "Buscar torrent",
+          "target": "S11-ready-mobile",
+          "regionHint": "botón Buscar torrent"
+        }
+      ],
+      "variantOf": "S06"
+    },
+    {
+      "id": "S06-remote",
+      "title": "Detalle película · remota",
+      "file": "assets/screens/s06-movie-remote.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Órbita Ciega no descargada; sin Play, descarga ni progreso.",
+      "hotspotSuggestions": [
+        {
+          "action": "Buscar torrent",
+          "target": "S11-ready",
+          "regionHint": "botón Buscar torrent"
+        }
+      ],
+      "variantOf": "S06"
+    },
+    {
+      "id": "S06-remote-mobile",
+      "title": "Detalle película · remota · móvil",
+      "file": "assets/screens/s06-movie-remote-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Órbita Ciega no descargada en móvil.",
+      "hotspotSuggestions": [
+        {
+          "action": "Buscar torrent",
+          "target": "S11-ready-mobile",
+          "regionHint": "botón Buscar torrent"
+        }
+      ],
+      "variantOf": "S06"
+    },
+    {
+      "id": "S06-pending",
+      "title": "Detalle película · pendiente",
+      "file": "assets/screens/s06-movie-pending.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Torrent aceptado, todavía pendiente de organización.",
+      "hotspotSuggestions": [
+        {
+          "action": "Ver biblioteca",
+          "target": "S05",
+          "regionHint": "nav Descargado"
+        },
+        {
+          "action": "Actualizar",
+          "target": "S06-pending",
+          "regionHint": "botón Actualizar metadatos"
+        }
+      ],
+      "variantOf": "S06"
+    },
+    {
+      "id": "S06-pending-mobile",
+      "title": "Detalle película · pendiente · móvil",
+      "file": "assets/screens/s06-movie-pending-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Torrent aceptado y pendiente en móvil.",
+      "hotspotSuggestions": [
+        {
+          "action": "Ver biblioteca",
+          "target": "S05-mobile",
+          "regionHint": "nav Descargado"
+        }
+      ],
+      "variantOf": "S06"
+    },
+    {
+      "id": "S06-plarr-down",
+      "title": "Detalle película · Plarr degradado",
+      "file": "assets/screens/s06-movie-plarr-down.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Archivo presente; Plarr degradado oculta Play y descarga, conserva torrent.",
+      "hotspotSuggestions": [
+        {
+          "action": "Recuperar Plarr",
+          "target": "S06",
+          "regionHint": "aviso Plarr"
+        },
+        {
+          "action": "Buscar torrent",
+          "target": "S11-ready",
+          "regionHint": "botón Buscar torrent"
+        }
+      ],
+      "variantOf": "S06"
+    },
+    {
+      "id": "S06-jackett-down",
+      "title": "Detalle película · Jackett degradado",
+      "file": "assets/screens/s06-movie-jackett-down.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Archivo presente; Jackett degradado oculta torrent y conserva Play/descarga.",
+      "hotspotSuggestions": [
+        {
+          "action": "Reanudar",
+          "target": "S09",
+          "regionHint": "botón Reanudar"
+        },
+        {
+          "action": "Recuperar Jackett",
+          "target": "S06",
+          "regionHint": "aviso Jackett"
+        }
+      ],
+      "variantOf": "S06"
+    },
+    {
+      "id": "S06-jackett-down-mobile",
+      "title": "Detalle película · Jackett degradado · móvil",
+      "file": "assets/screens/s06-movie-jackett-down-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Jackett degradado en móvil; reproducción disponible.",
+      "hotspotSuggestions": [
+        {
+          "action": "Reanudar",
+          "target": "S09-mobile",
+          "regionHint": "botón Reanudar"
+        },
+        {
+          "action": "Recuperar Jackett",
+          "target": "S06-mobile",
+          "regionHint": "aviso Jackett"
+        }
+      ],
+      "variantOf": "S06"
+    },
+    {
+      "id": "S06-qbittorrent-down",
+      "title": "Detalle película · qBittorrent degradado",
+      "file": "assets/screens/s06-movie-torrents-down.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Archivo presente; qBittorrent degradado oculta torrent y conserva Play/descarga.",
+      "hotspotSuggestions": [
+        {
+          "action": "Reanudar",
+          "target": "S09",
+          "regionHint": "botón Reanudar"
+        },
+        {
+          "action": "Recuperar qBittorrent",
+          "target": "S06",
+          "regionHint": "aviso qBittorrent"
+        }
+      ],
+      "variantOf": "S06"
+    },
+    {
+      "id": "S07",
+      "title": "Detalle serie",
+      "file": "assets/screens/s07-show.png",
+      "width": 1671,
+      "height": 941,
+      "description": "Puerto Umbral: 5/8 disponibles, 3/8 vistos y T2 con error sin denominador.",
+      "hotspotSuggestions": [
+        {
+          "action": "Reproducir E01",
+          "target": "S09-episode-e01",
+          "regionHint": "botón E01"
+        },
+        {
+          "action": "Reanudar E02",
+          "target": "S09-episode",
+          "regionHint": "botón E02"
+        },
+        {
+          "action": "Buscar E03",
+          "target": "S11-ready",
+          "regionHint": "botón E03"
+        },
+        {
+          "action": "Reintentar T2",
+          "target": "S07",
+          "regionHint": "botón Reintentar"
+        }
+      ]
+    },
+    {
+      "id": "S07-mobile",
+      "title": "Detalle serie · móvil",
+      "file": "assets/screens/s07-show-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Puerto Umbral móvil con disponibilidad, progreso y error T2 coherentes.",
+      "hotspotSuggestions": [
+        {
+          "action": "Reproducir E01",
+          "target": "S09-episode-e01-mobile",
+          "regionHint": "botón E01"
+        },
+        {
+          "action": "Reanudar E02",
+          "target": "S09-episode-mobile",
+          "regionHint": "botón E02"
+        },
+        {
+          "action": "Buscar E03",
+          "target": "S11-ready-mobile",
+          "regionHint": "botón E03"
+        }
+      ],
+      "variantOf": "S07"
+    },
+    {
+      "id": "S08",
+      "title": "Colección · lista",
+      "file": "assets/screens/s08-collection-ready.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Colección lista en un único estado.",
+      "hotspotSuggestions": [
+        {
+          "action": "Abrir título",
+          "target": "S06",
+          "regionHint": "tarjeta Órbita Ciega"
+        },
+        {
+          "action": "Volver",
+          "target": "S03",
+          "regionHint": "nav Inicio"
+        }
+      ]
+    },
+    {
+      "id": "S08-mobile",
+      "title": "Colección · lista · móvil",
+      "file": "assets/screens/s08-collection-ready-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Colección móvil lista.",
+      "hotspotSuggestions": [
+        {
+          "action": "Abrir título",
+          "target": "S06-mobile",
+          "regionHint": "tarjeta Órbita Ciega"
+        }
+      ],
+      "variantOf": "S08"
+    },
+    {
+      "id": "S08-empty",
+      "title": "Colección · vacía",
+      "file": "assets/screens/s08-collection-empty.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Colección sin elementos.",
+      "hotspotSuggestions": [
+        {
+          "action": "Explorar",
+          "target": "S04-ready",
+          "regionHint": "botón Explorar"
+        }
+      ],
+      "variantOf": "S08"
+    },
+    {
+      "id": "S08-empty-mobile",
+      "title": "Colección · vacía · móvil",
+      "file": "assets/screens/s08-collection-empty-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Colección móvil sin elementos.",
+      "hotspotSuggestions": [
+        {
+          "action": "Explorar",
+          "target": "S04-ready-mobile",
+          "regionHint": "botón Explorar"
+        }
+      ],
+      "variantOf": "S08"
+    },
+    {
+      "id": "S08-error",
+      "title": "Colección · error",
+      "file": "assets/screens/s08-collection-error.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Error de carga de colección con recuperación.",
+      "hotspotSuggestions": [
+        {
+          "action": "Reintentar",
+          "target": "S08",
+          "regionHint": "botón Reintentar"
+        }
+      ],
+      "variantOf": "S08"
+    },
+    {
+      "id": "S08-error-mobile",
+      "title": "Colección · error · móvil",
+      "file": "assets/screens/s08-collection-error-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Error móvil de colección.",
+      "hotspotSuggestions": [
+        {
+          "action": "Reintentar",
+          "target": "S08-mobile",
+          "regionHint": "botón Reintentar"
+        }
+      ],
+      "variantOf": "S08"
+    },
+    {
+      "id": "S09",
+      "title": "Player película",
+      "file": "assets/screens/s09-player.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Reproductor normal de Órbita Ciega.",
+      "hotspotSuggestions": [
+        {
+          "action": "Cerrar",
+          "target": "S06",
+          "regionHint": "botón Cerrar"
+        }
+      ]
+    },
+    {
+      "id": "S09-mobile",
+      "title": "Player película · móvil",
+      "file": "assets/screens/s09-player-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Reproductor móvil de Órbita Ciega.",
+      "hotspotSuggestions": [
+        {
+          "action": "Cerrar",
+          "target": "S06-mobile",
+          "regionHint": "botón Cerrar"
+        }
+      ],
+      "variantOf": "S09"
+    },
+    {
+      "id": "S09-episode",
+      "title": "Player episodio E02",
+      "file": "assets/screens/s09-player-episode.png",
+      "width": 1672,
+      "height": 941,
+      "description": "E02 al 38 %; E03 ausente vuelve a su acción torrent.",
+      "hotspotSuggestions": [
+        {
+          "action": "Cerrar",
+          "target": "S07",
+          "regionHint": "botón Cerrar"
+        },
+        {
+          "action": "Anterior E01",
+          "target": "S09-episode-e01",
+          "regionHint": "botón Anterior"
+        },
+        {
+          "action": "E03 no disponible",
+          "target": "S07",
+          "regionHint": "botón Siguiente"
+        }
+      ]
+    },
+    {
+      "id": "S09-episode-mobile",
+      "title": "Player episodio E02 · móvil",
+      "file": "assets/screens/s09-player-episode-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "E02 móvil; siguiente E03 no disponible.",
+      "hotspotSuggestions": [
+        {
+          "action": "Cerrar",
+          "target": "S07-mobile",
+          "regionHint": "botón Cerrar"
+        },
+        {
+          "action": "Anterior E01",
+          "target": "S09-episode-e01-mobile",
+          "regionHint": "botón Anterior"
+        },
+        {
+          "action": "E03 no disponible",
+          "target": "S07-mobile",
+          "regionHint": "botón Siguiente"
+        }
+      ],
+      "variantOf": "S09-episode"
+    },
+    {
+      "id": "S09-episode-e01",
+      "title": "Player episodio E01",
+      "file": "assets/screens/s09-player-episode-e01.png",
+      "width": 1672,
+      "height": 941,
+      "description": "E01 normal; anterior deshabilitado y siguiente E02.",
+      "hotspotSuggestions": [
+        {
+          "action": "Cerrar",
+          "target": "S07",
+          "regionHint": "botón Cerrar"
+        },
+        {
+          "action": "Siguiente E02",
+          "target": "S09-episode",
+          "regionHint": "botón Siguiente"
+        }
+      ],
+      "variantOf": "S09-episode"
+    },
+    {
+      "id": "S09-episode-e01-mobile",
+      "title": "Player episodio E01 · móvil",
+      "file": "assets/screens/s09-player-episode-e01-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "E01 móvil; siguiente E02.",
+      "hotspotSuggestions": [
+        {
+          "action": "Cerrar",
+          "target": "S07-mobile",
+          "regionHint": "botón Cerrar"
+        },
+        {
+          "action": "Siguiente E02",
+          "target": "S09-episode-mobile",
+          "regionHint": "botón Siguiente"
+        }
+      ],
+      "variantOf": "S09-episode"
+    },
+    {
+      "id": "S09-episode-e05",
+      "title": "Player episodio E05",
+      "file": "assets/screens/s09-player-episode-e05.png",
+      "width": 1672,
+      "height": 941,
+      "description": "E05 cerca del final; conduce al autoplay.",
+      "hotspotSuggestions": [
+        {
+          "action": "Finalizar E05",
+          "target": "S10",
+          "regionHint": "barra al final"
+        },
+        {
+          "action": "Cerrar",
+          "target": "S07",
+          "regionHint": "botón Cerrar"
+        }
+      ],
+      "variantOf": "S09-episode"
+    },
+    {
+      "id": "S09-episode-e05-mobile",
+      "title": "Player episodio E05 · móvil",
+      "file": "assets/screens/s09-player-episode-e05-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "E05 móvil cerca del final.",
+      "hotspotSuggestions": [
+        {
+          "action": "Finalizar E05",
+          "target": "S10-mobile",
+          "regionHint": "barra al final"
+        },
+        {
+          "action": "Cerrar",
+          "target": "S07-mobile",
+          "regionHint": "botón Cerrar"
+        }
+      ],
+      "variantOf": "S09-episode"
+    },
+    {
+      "id": "S09-episode-e06",
+      "title": "Player episodio E06",
+      "file": "assets/screens/s09-player-episode-e06.png",
+      "width": 1672,
+      "height": 941,
+      "description": "E06 La baliza; siguiente deshabilitado.",
+      "hotspotSuggestions": [
+        {
+          "action": "Anterior E05",
+          "target": "S09-episode-e05",
+          "regionHint": "botón Anterior"
+        },
+        {
+          "action": "Cerrar",
+          "target": "S07",
+          "regionHint": "botón Cerrar"
+        }
+      ],
+      "variantOf": "S09-episode"
+    },
+    {
+      "id": "S09-episode-e06-mobile",
+      "title": "Player episodio E06 · móvil",
+      "file": "assets/screens/s09-player-episode-e06-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "E06 móvil; siguiente deshabilitado.",
+      "hotspotSuggestions": [
+        {
+          "action": "Anterior E05",
+          "target": "S09-episode-e05-mobile",
+          "regionHint": "botón Anterior"
+        },
+        {
+          "action": "Cerrar",
+          "target": "S07-mobile",
+          "regionHint": "botón Cerrar"
+        }
+      ],
+      "variantOf": "S09-episode"
+    },
+    {
+      "id": "S10",
+      "title": "Autoplay E05 → E06",
+      "file": "assets/screens/s10-autoplay.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Autoplay único tras E05 hacia E06 La baliza.",
+      "hotspotSuggestions": [
+        {
+          "action": "Reproducir ahora",
+          "target": "S09-episode-e06",
+          "regionHint": "botón Reproducir ahora"
+        },
+        {
+          "action": "Cancelar",
+          "target": "S09-episode-e05",
+          "regionHint": "botón Cancelar"
+        }
+      ]
+    },
+    {
+      "id": "S10-mobile",
+      "title": "Autoplay E05 → E06 · móvil",
+      "file": "assets/screens/s10-autoplay-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Autoplay móvil hacia E06.",
+      "hotspotSuggestions": [
+        {
+          "action": "Reproducir ahora",
+          "target": "S09-episode-e06-mobile",
+          "regionHint": "botón Reproducir ahora"
+        },
+        {
+          "action": "Cancelar",
+          "target": "S09-episode-e05-mobile",
+          "regionHint": "botón Cancelar"
+        }
+      ],
+      "variantOf": "S10"
+    },
+    {
+      "id": "S11",
+      "title": "Torrent · resultados",
+      "file": "assets/screens/s11-torrent-results.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Resultados Jackett con botones Enviar reales.",
+      "hotspotSuggestions": [
+        {
+          "action": "Enviar torrent",
+          "target": "S11-sending",
+          "regionHint": "botón Enviar de una fila"
+        },
+        {
+          "action": "Volver",
+          "target": "S06-remote",
+          "regionHint": "botón Volver"
+        }
+      ]
+    },
+    {
+      "id": "S11-mobile",
+      "title": "Torrent · resultados · móvil",
+      "file": "assets/screens/s11-torrent-results-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Resultados móviles con Enviar en la fila correcta.",
+      "hotspotSuggestions": [
+        {
+          "action": "Enviar torrent",
+          "target": "S11-sending-mobile",
+          "regionHint": "botón Enviar de una fila"
+        },
+        {
+          "action": "Volver",
+          "target": "S06-remote-mobile",
+          "regionHint": "botón Volver"
+        }
+      ],
+      "variantOf": "S11"
+    },
+    {
+      "id": "S11-ready",
+      "title": "Torrent · listo",
+      "file": "assets/screens/s11-torrent-ready.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Estado listo del flujo torrent.",
+      "hotspotSuggestions": [
+        {
+          "action": "Buscar",
+          "target": "S11-loading",
+          "regionHint": "botón Buscar"
+        }
+      ],
+      "variantOf": "S11"
+    },
+    {
+      "id": "S11-ready-mobile",
+      "title": "Torrent · listo · móvil",
+      "file": "assets/screens/s11-torrent-ready-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Estado móvil listo del flujo torrent.",
+      "hotspotSuggestions": [
+        {
+          "action": "Buscar",
+          "target": "S11-loading-mobile",
+          "regionHint": "botón Buscar"
+        }
+      ],
+      "variantOf": "S11"
+    },
+    {
+      "id": "S11-loading",
+      "title": "Torrent · cargando",
+      "file": "assets/screens/s11-torrent-loading.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Estado cargando del flujo torrent.",
+      "hotspotSuggestions": [
+        {
+          "action": "Resultados recibidos",
+          "target": "S11",
+          "regionHint": "indicador Buscando"
+        }
+      ],
+      "variantOf": "S11"
+    },
+    {
+      "id": "S11-loading-mobile",
+      "title": "Torrent · cargando · móvil",
+      "file": "assets/screens/s11-torrent-loading-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Estado móvil cargando del flujo torrent.",
+      "hotspotSuggestions": [
+        {
+          "action": "Resultados recibidos",
+          "target": "S11-mobile",
+          "regionHint": "indicador Buscando"
+        }
+      ],
+      "variantOf": "S11"
+    },
+    {
+      "id": "S11-sending",
+      "title": "Torrent · enviando",
+      "file": "assets/screens/s11-torrent-sending.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Estado enviando del flujo torrent.",
+      "hotspotSuggestions": [
+        {
+          "action": "Envío aceptado",
+          "target": "S11-accepted",
+          "regionHint": "fila en envío"
+        }
+      ],
+      "variantOf": "S11"
+    },
+    {
+      "id": "S11-sending-mobile",
+      "title": "Torrent · enviando · móvil",
+      "file": "assets/screens/s11-torrent-sending-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Estado móvil enviando del flujo torrent.",
+      "hotspotSuggestions": [
+        {
+          "action": "Envío aceptado",
+          "target": "S11-accepted-mobile",
+          "regionHint": "fila en envío"
+        }
+      ],
+      "variantOf": "S11"
+    },
+    {
+      "id": "S11-accepted",
+      "title": "Torrent · aceptado",
+      "file": "assets/screens/s11-torrent-accepted.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Estado aceptado del flujo torrent.",
+      "hotspotSuggestions": [
+        {
+          "action": "Ver película",
+          "target": "S06-pending",
+          "regionHint": "botón Ver estado"
+        }
+      ],
+      "variantOf": "S11"
+    },
+    {
+      "id": "S11-accepted-mobile",
+      "title": "Torrent · aceptado · móvil",
+      "file": "assets/screens/s11-torrent-accepted-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Estado móvil aceptado del flujo torrent.",
+      "hotspotSuggestions": [
+        {
+          "action": "Ver película",
+          "target": "S06-pending-mobile",
+          "regionHint": "botón Ver estado"
+        }
+      ],
+      "variantOf": "S11"
+    },
+    {
+      "id": "S11-error",
+      "title": "Torrent · error",
+      "file": "assets/screens/s11-torrent-error.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Estado error del flujo torrent.",
+      "hotspotSuggestions": [
+        {
+          "action": "Reintentar",
+          "target": "S11",
+          "regionHint": "botón Reintentar"
+        }
+      ],
+      "variantOf": "S11"
+    },
+    {
+      "id": "S11-error-mobile",
+      "title": "Torrent · error · móvil",
+      "file": "assets/screens/s11-torrent-error-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Estado móvil error del flujo torrent.",
+      "hotspotSuggestions": [
+        {
+          "action": "Reintentar",
+          "target": "S11-mobile",
+          "regionHint": "botón Reintentar"
+        }
+      ],
+      "variantOf": "S11"
+    },
+    {
+      "id": "S12",
+      "title": "Ajustes · listo",
+      "file": "assets/screens/s12-settings-ready.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Ajustes listos, sin menú, diálogo ni confirmación simultáneos.",
+      "hotspotSuggestions": [
+        {
+          "action": "Guardar",
+          "target": "S12-saved",
+          "regionHint": "botón Guardar"
+        },
+        {
+          "action": "Eliminar perfil",
+          "target": "S12-delete-dialog",
+          "regionHint": "botón Eliminar"
+        },
+        {
+          "action": "Abrir menú",
+          "target": "S12-menu",
+          "regionHint": "avatar"
+        }
+      ]
+    },
+    {
+      "id": "S12-mobile",
+      "title": "Ajustes · listo · móvil",
+      "file": "assets/screens/s12-settings-ready-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Ajustes móviles listos.",
+      "hotspotSuggestions": [
+        {
+          "action": "Guardar",
+          "target": "S12-saved-mobile",
+          "regionHint": "botón Guardar"
+        },
+        {
+          "action": "Eliminar perfil",
+          "target": "S12-delete-dialog-mobile",
+          "regionHint": "botón Eliminar"
+        },
+        {
+          "action": "Abrir menú",
+          "target": "S12-menu-mobile",
+          "regionHint": "avatar"
+        }
+      ],
+      "variantOf": "S12"
+    },
+    {
+      "id": "S12-saved",
+      "title": "Ajustes · guardado",
+      "file": "assets/screens/s12-settings-saved.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Confirmación única de ajustes guardados.",
+      "hotspotSuggestions": [
+        {
+          "action": "Volver a inicio",
+          "target": "S03",
+          "regionHint": "nav Inicio"
+        }
+      ],
+      "variantOf": "S12"
+    },
+    {
+      "id": "S12-saved-mobile",
+      "title": "Ajustes · guardado · móvil",
+      "file": "assets/screens/s12-settings-saved-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Confirmación móvil de ajustes guardados.",
+      "hotspotSuggestions": [
+        {
+          "action": "Volver a inicio",
+          "target": "S03-mobile",
+          "regionHint": "nav Inicio"
+        }
+      ],
+      "variantOf": "S12"
+    },
+    {
+      "id": "S12-delete-dialog",
+      "title": "Ajustes · confirmar borrado",
+      "file": "assets/screens/s12-settings-delete-dialog.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Diálogo único de confirmación destructiva.",
+      "hotspotSuggestions": [
+        {
+          "action": "Cancelar",
+          "target": "S12",
+          "regionHint": "botón Cancelar"
+        },
+        {
+          "action": "Confirmar borrado",
+          "target": "S02",
+          "regionHint": "botón Eliminar"
+        }
+      ],
+      "variantOf": "S12"
+    },
+    {
+      "id": "S12-delete-dialog-mobile",
+      "title": "Ajustes · confirmar borrado · móvil",
+      "file": "assets/screens/s12-settings-delete-dialog-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Diálogo móvil de confirmación destructiva.",
+      "hotspotSuggestions": [
+        {
+          "action": "Cancelar",
+          "target": "S12-mobile",
+          "regionHint": "botón Cancelar"
+        },
+        {
+          "action": "Confirmar borrado",
+          "target": "S02-mobile",
+          "regionHint": "botón Eliminar"
+        }
+      ],
+      "variantOf": "S12"
+    },
+    {
+      "id": "S12-menu",
+      "title": "Ajustes · menú de cuenta",
+      "file": "assets/screens/s12-settings-menu.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Menú de cuenta aislado.",
+      "hotspotSuggestions": [
+        {
+          "action": "Administración",
+          "target": "S13",
+          "regionHint": "opción Administración"
+        },
+        {
+          "action": "Cerrar menú",
+          "target": "S12",
+          "regionHint": "fuera del menú"
+        }
+      ],
+      "variantOf": "S12"
+    },
+    {
+      "id": "S12-menu-mobile",
+      "title": "Ajustes · menú de cuenta · móvil",
+      "file": "assets/screens/s12-settings-menu-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Menú móvil de cuenta aislado.",
+      "hotspotSuggestions": [
+        {
+          "action": "Administración",
+          "target": "S13-mobile",
+          "regionHint": "opción Administración"
+        },
+        {
+          "action": "Cerrar menú",
+          "target": "S12-mobile",
+          "regionHint": "fuera del menú"
+        }
+      ],
+      "variantOf": "S12"
+    },
+    {
+      "id": "S13",
+      "title": "Administración · listo",
+      "file": "assets/screens/s13-admin-ready.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Administración lista, sin error, menú ni diálogo simultáneos.",
+      "hotspotSuggestions": [
+        {
+          "action": "Crear duplicado",
+          "target": "S13-duplicate-error",
+          "regionHint": "botón Crear usuario"
+        },
+        {
+          "action": "Abrir miembro",
+          "target": "S13-member-menu",
+          "regionHint": "menú de miembro"
+        },
+        {
+          "action": "Restablecer contraseña",
+          "target": "S13-reset-dialog",
+          "regionHint": "acción Restablecer"
+        }
+      ]
+    },
+    {
+      "id": "S13-mobile",
+      "title": "Administración · listo · móvil",
+      "file": "assets/screens/s13-admin-ready-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Administración móvil lista.",
+      "hotspotSuggestions": [
+        {
+          "action": "Crear duplicado",
+          "target": "S13-duplicate-error-mobile",
+          "regionHint": "botón Crear usuario"
+        },
+        {
+          "action": "Abrir miembro",
+          "target": "S13-member-menu-mobile",
+          "regionHint": "menú de miembro"
+        },
+        {
+          "action": "Restablecer contraseña",
+          "target": "S13-reset-dialog-mobile",
+          "regionHint": "acción Restablecer"
+        }
+      ],
+      "variantOf": "S13"
+    },
+    {
+      "id": "S13-duplicate-error",
+      "title": "Administración · usuario duplicado",
+      "file": "assets/screens/s13-admin-duplicate-error.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Error único por nombre de usuario duplicado.",
+      "hotspotSuggestions": [
+        {
+          "action": "Corregir usuario",
+          "target": "S13",
+          "regionHint": "campo Usuario"
+        }
+      ],
+      "variantOf": "S13"
+    },
+    {
+      "id": "S13-duplicate-error-mobile",
+      "title": "Administración · usuario duplicado · móvil",
+      "file": "assets/screens/s13-admin-duplicate-error-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Error móvil por usuario duplicado.",
+      "hotspotSuggestions": [
+        {
+          "action": "Corregir usuario",
+          "target": "S13-mobile",
+          "regionHint": "campo Usuario"
+        }
+      ],
+      "variantOf": "S13"
+    },
+    {
+      "id": "S13-member-menu",
+      "title": "Administración · menú de miembro",
+      "file": "assets/screens/s13-admin-member-menu.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Menú contextual aislado para un miembro.",
+      "hotspotSuggestions": [
+        {
+          "action": "Restablecer contraseña",
+          "target": "S13-reset-dialog",
+          "regionHint": "opción Restablecer"
+        },
+        {
+          "action": "Cerrar menú",
+          "target": "S13",
+          "regionHint": "fuera del menú"
+        }
+      ],
+      "variantOf": "S13"
+    },
+    {
+      "id": "S13-member-menu-mobile",
+      "title": "Administración · menú de miembro · móvil",
+      "file": "assets/screens/s13-admin-member-menu-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Menú móvil aislado para un miembro.",
+      "hotspotSuggestions": [
+        {
+          "action": "Restablecer contraseña",
+          "target": "S13-reset-dialog-mobile",
+          "regionHint": "opción Restablecer"
+        },
+        {
+          "action": "Cerrar menú",
+          "target": "S13-mobile",
+          "regionHint": "fuera del menú"
+        }
+      ],
+      "variantOf": "S13"
+    },
+    {
+      "id": "S13-reset-dialog",
+      "title": "Administración · confirmar restablecimiento",
+      "file": "assets/screens/s13-admin-reset-dialog.png",
+      "width": 1672,
+      "height": 941,
+      "description": "Diálogo único para restablecer contraseña.",
+      "hotspotSuggestions": [
+        {
+          "action": "Cancelar",
+          "target": "S13",
+          "regionHint": "botón Cancelar"
+        },
+        {
+          "action": "Confirmar",
+          "target": "S13",
+          "regionHint": "botón Restablecer"
+        }
+      ],
+      "variantOf": "S13"
+    },
+    {
+      "id": "S13-reset-dialog-mobile",
+      "title": "Administración · confirmar restablecimiento · móvil",
+      "file": "assets/screens/s13-admin-reset-dialog-mobile.png",
+      "width": 853,
+      "height": 1844,
+      "description": "Diálogo móvil para restablecer contraseña.",
+      "hotspotSuggestions": [
+        {
+          "action": "Cancelar",
+          "target": "S13-mobile",
+          "regionHint": "botón Cancelar"
+        },
+        {
+          "action": "Confirmar",
+          "target": "S13-mobile",
+          "regionHint": "botón Restablecer"
+        }
+      ],
+      "variantOf": "S13"
+    }
+  ]
+}

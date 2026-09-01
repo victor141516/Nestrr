@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#090d18" />
+    <title>Nestrr · prototipo navegable</title>
+    <link rel="stylesheet" href="styles.css?v=7" />
+  </head>
+  <body>
+    <a class="skip-link" href="#prototype-stage">Saltar al prototipo</a>
+
+    <header class="prototype-toolbar" aria-label="Controles del prototipo">
+      <div class="toolbar-brand">
+        <span class="brand-mark">N</span>
+        <div>
+          <strong>Nestrr</strong>
+          <small>Prototipo de rediseño</small>
+        </div>
+      </div>
+
+      <div class="toolbar-history" role="group" aria-label="Historial">
+        <button id="back-button" type="button" aria-label="Pantalla anterior">←</button>
+        <button id="forward-button" type="button" aria-label="Pantalla siguiente">→</button>
+      </div>
+
+      <label class="screen-picker">
+        <span>Pantalla</span>
+        <select id="screen-select" aria-label="Elegir pantalla"></select>
+      </label>
+
+      <label class="flow-picker">
+        <span>Flujo</span>
+        <select id="flow-select" aria-label="Elegir recorrido">
+          <option value="">Recorrido libre</option>
+          <option value="auth">Acceso → descubrimiento</option>
+          <option value="movie">Película → torrent → biblioteca → play</option>
+          <option value="show">Serie parcial → episodio ausente → torrent</option>
+          <option value="autoplay">Episodio 5 → autoplay → episodio 6</option>
+          <option value="admin">Admin → suplantar → volver</option>
+          <option value="slow">Conexión lenta → 240p → recuperación</option>
+          <option value="degraded">Servicios degradados → recuperación localizada</option>
+        </select>
+      </label>
+
+      <div class="toolbar-actions">
+        <button id="variant-button" type="button" aria-pressed="false">Vista móvil</button>
+        <button id="hotspots-button" class="active" type="button" aria-pressed="true">Zonas visibles</button>
+        <button id="info-button" type="button" aria-expanded="false" aria-controls="info-panel">Información</button>
+      </div>
+    </header>
+
+    <main class="prototype-layout">
+      <section class="prototype-copy" aria-live="polite">
+        <div>
+          <p id="screen-kicker">Pantalla S00</p>
+          <h1 id="screen-title">Carga inicial</h1>
+          <p id="screen-description"></p>
+        </div>
+        <div class="prototype-status">
+          <span id="viewport-label">Escritorio</span>
+          <span id="hotspot-count">0 zonas</span>
+        </div>
+      </section>
+
+      <details id="flow-progress" class="flow-progress" hidden open>
+        <summary><strong id="flow-title"></strong><span>Mostrar/ocultar recorrido</span></summary>
+        <p id="flow-description"></p>
+        <ol id="flow-steps"></ol>
+      </details>
+
+      <section id="scenario-controls" class="scenario-controls" hidden aria-label="Condición inicial">
+      </section>
+
+      <section id="prototype-stage" class="stage" tabindex="-1" aria-label="Pantalla interactiva del prototipo">
+        <div id="screen-frame" class="screen-frame">
+          <img id="screen-image" alt="" draggable="false" />
+          <div id="impersonation-overlay" class="impersonation-overlay" hidden>
+            <span>Viendo Nestrr como <strong>Bruno</strong></span>
+            <button id="stop-impersonation" type="button">Volver al administrador</button>
+          </div>
+          <div id="hotspot-layer" class="hotspot-layer"></div>
+          <div id="action-state" class="action-state" hidden></div>
+        </div>
+      </section>
+      <p id="screen-announcement" class="sr-only" role="status" aria-live="polite"></p>
+
+      <details class="semantic-panel" open>
+        <summary>Ficha semántica de esta pantalla</summary>
+        <p id="semantic-summary"></p>
+        <dl id="semantic-facts"></dl>
+      </details>
+
+      <aside id="info-panel" class="info-panel" role="dialog" aria-modal="true" aria-labelledby="info-heading" hidden>
+        <div>
+          <h2 id="info-heading">Cómo probarlo</h2>
+          <button id="close-info" type="button" aria-label="Cerrar información">×</button>
+        </div>
+        <p>Las zonas resaltadas son botones reales colocados sobre la captura. Activa o desactiva sus contornos con <kbd>H</kbd>. Usa Atrás/Adelante o las flechas del teclado para recorrer el historial.</p>
+        <p>Las acciones que no cambian de pantalla simulan un cambio de estado y lo anuncian sin falsear una función nueva. El selector móvil usa una captura propia cuando existe; en el resto mantiene la pantalla de escritorio.</p>
+        <p><strong>Consejo de revisión:</strong> elige un flujo guiado y comprueba que ninguna etapa termina en un callejón.</p>
+      </aside>
+    </main>
+
+    <div id="toast" class="prototype-toast" role="status" aria-live="polite" hidden></div>
+    <script src="prototype-data.js?v=7"></script>
+    <script src="app.js?v=7"></script>
+  </body>
+</html>

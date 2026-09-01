@@ -1,0 +1,16 @@
+services:
+  mocktmdb:
+    build: .
+    entrypoint: ["mocktmdb"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9090/stats"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+  nestrr:
+    depends_on:
+      mocktmdb: { condition: service_healthy }
+    environment:
+      NESTRR_TMDB_BASE_URL: http://mocktmdb:9090/3
+      NESTRR_TMDB_IMAGE_BASE_URL: http://mocktmdb:9090/image

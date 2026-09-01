@@ -1,0 +1,8 @@
+{
+  "name": "nestrr-e2e-runner",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "playwright": "1.55.0"
+  }
+}
