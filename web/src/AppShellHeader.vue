@@ -45,10 +45,12 @@ function handleDocumentPointer(event: PointerEvent): void {
   if (!accountWrap.value?.contains(event.target as Node)) closeMenu();
 }
 
-function handleFocusOut(): void {
-  void nextTick(() => {
-    if (!accountWrap.value?.contains(document.activeElement)) closeMenu();
-  });
+function handleFocusOut(event: FocusEvent): void {
+  const nextTarget = event.relatedTarget;
+  if (nextTarget instanceof Node && accountWrap.value?.contains(nextTarget)) {
+    return;
+  }
+  closeMenu();
 }
 
 watch(
@@ -87,6 +89,12 @@ function logout(): void {
         ><AppIcon name="compass" />{{ translate("explore") }}</RouterLink
       ><RouterLink :class="{ active: path.startsWith('/lists') }" to="/lists"
         ><AppIcon name="list" />{{ translate("lists") }}</RouterLink
+      ><RouterLink
+        :class="{ active: path === '/recommendations' }"
+        to="/recommendations"
+        ><AppIcon name="sparkles" />{{
+          translate("recommendations")
+        }}</RouterLink
       >
     </nav>
     <div class="header-spacer" />

@@ -8,6 +8,7 @@ import {
   type DetailRequest,
 } from "./detailState";
 import type { TranslationKey } from "./i18n";
+import { movieCredits } from "./mediaCredits";
 import { queryString } from "./navigationState";
 import { initialOpenSeason } from "./seasonState";
 import type { Availability } from "./useAvailabilityTorrents";
@@ -68,6 +69,12 @@ export function useMediaDetail(options: Options) {
             () => null,
           )
         : Promise.resolve(null);
+    const creditsRequest =
+      kind === "movie"
+        ? api<any>(`/catalog/movie/${id}/credits${refreshQuery}`).catch(
+            () => null,
+          )
+        : Promise.resolve(null);
     const [doc, progressDoc, progressList] = await Promise.all([
       api<any>(`/catalog/${kind}/${id}${refreshQuery}`),
       kind === "movie"
@@ -85,6 +92,7 @@ export function useMediaDetail(options: Options) {
     progress.value = progressList.items || progress.value;
     doc.media_type = kind;
     doc._keywords = [];
+    doc._credits = { directors: [], cast: [] };
     doc._recommendations = [];
     if (kind === "tv" && doc.seasons) {
       const routeSeason = Number(queryString(currentRoute.query.season as any));
@@ -104,6 +112,7 @@ export function useMediaDetail(options: Options) {
     detail.value = doc;
     detailProgress.value = progressDoc;
     void hydrateDetailKeywords(keywordsRequest, request);
+    void hydrateDetailCredits(creditsRequest, request);
     if (kind === "tv") {
       // Use the reactive season proxy exposed through detail.value. Mutating a
       // season from the raw TMDB document after assigning it to a Vue ref does
@@ -142,6 +151,25 @@ export function useMediaDetail(options: Options) {
       seen.add(id);
       return [{ id, name }];
     });
+  }
+
+  async function hydrateDetailCredits(
+    requestPromise: Promise<any | null>,
+    request: DetailRequest,
+  ) {
+    const payload = await requestPromise;
+    if (
+      !payload ||
+      request.kind !== "movie" ||
+      !isCurrentDetailRequest(
+        request,
+        detailRequestRevision,
+        currentKind.value,
+        detail.value,
+      )
+    )
+      return;
+    detail.value._credits = movieCredits(payload);
   }
 
   function scheduleSeasonPreload(show: any) {

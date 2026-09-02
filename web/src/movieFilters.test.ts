@@ -30,6 +30,8 @@ describe("movie filters", () => {
       includeKeywords: [{ id: 9715, name: "superhero" }],
       excludeKeywords: [{ id: 180734, name: "masked superhero" }],
       includeCompanies: [{ id: 33, name: "Universal Pictures" }],
+      cast: [{ id: 234352, name: "Margot Robbie" }],
+      directors: [{ id: 1032, name: "Martin Scorsese" }],
       productionCountries: ["ES", "FR|DE"],
       ageMin: 7,
       ageMax: 18,
@@ -49,11 +51,13 @@ describe("movie filters", () => {
       with_keywords: "9715",
       without_keywords: "180734",
       with_companies: "33",
+      with_cast: "234352",
+      directors: "1032",
       with_origin_country: "ES|FR|DE",
     });
     expect(params.has("rottenTomatoesMin")).toBe(false);
     expect(params.has("rottenTomatoesMax")).toBe(false);
-    expect(activeMovieFilterCount(filters)).toBe(11);
+    expect(activeMovieFilterCount(filters)).toBe(13);
     expect(matchesRottenTomatoes(91, filters)).toBe(true);
     expect(matchesRottenTomatoes(undefined, filters)).toBe(false);
   });

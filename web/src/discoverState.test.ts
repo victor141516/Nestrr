@@ -22,6 +22,10 @@ describe("explore URL state", () => {
       excludeKeywords: "180734",
       includeCompanies: "33,4",
       companyNames: '["Universal Pictures","Paramount Pictures"]',
+      cast: "234352",
+      castNames: '["Margot Robbie"]',
+      directors: "1032",
+      directorNames: '["Martin Scorsese"]',
       countries: "US,FR|DE",
     };
     const parsed = parseExploreQuery(original, "es-ES");
@@ -43,6 +47,10 @@ describe("explore URL state", () => {
       excludeKeywords: "180734",
       includeCompanies: "33,4",
       companyNames: '["Universal Pictures","Paramount Pictures"]',
+      cast: "234352",
+      castNames: '["Margot Robbie"]',
+      directors: "1032",
+      directorNames: '["Martin Scorsese"]',
       countries: "US,FR|DE",
     });
   });
@@ -69,6 +77,29 @@ describe("explore URL state", () => {
     expect(exploreQuery(parsed.kind, "", null, parsed.downloaded)).toEqual({
       type: "Shows",
       downloaded: "1",
+    });
+  });
+
+  it("round-trips sorting without treating it as an advanced filter", () => {
+    const parsed = parseExploreQuery({ type: "tv", sort: "release" });
+    expect(parsed.sort).toBe("release");
+    expect(parsed.filters).toBeNull();
+    expect(
+      exploreQuery(
+        parsed.kind,
+        parsed.query,
+        parsed.filters,
+        parsed.downloaded,
+        parsed.sort,
+      ),
+    ).toEqual({ type: "Shows", sort: "release" });
+  });
+
+  it("falls back to popularity for missing or invalid sorting", () => {
+    expect(parseExploreQuery({}).sort).toBe("popularity");
+    expect(parseExploreQuery({ sort: "unknown" }).sort).toBe("popularity");
+    expect(exploreQuery("movie", "", null, false, "popularity")).toEqual({
+      type: "Movies",
     });
   });
 

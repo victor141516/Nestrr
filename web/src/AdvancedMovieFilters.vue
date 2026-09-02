@@ -2,8 +2,10 @@
 import { computed, reactive, watch } from "vue";
 import AppIcon from "./AppIcon.vue";
 import CountryMultiSelect from "./CountryMultiSelect.vue";
+import CompanyTagInput from "./CompanyTagInput.vue";
 import DualRangeSlider from "./DualRangeSlider.vue";
 import KeywordTagInput from "./KeywordTagInput.vue";
+import PersonTagInput from "./PersonTagInput.vue";
 import { session } from "./api";
 import { tr } from "./i18n";
 import {
@@ -60,6 +62,15 @@ function setExcludedKeywords(value: MovieFilters["excludeKeywords"]) {
   draft.includeKeywords = draft.includeKeywords.filter(
     (keyword) => !selected.has(keyword.id),
   );
+}
+function setCast(value: MovieFilters["cast"]) {
+  draft.cast = value;
+}
+function setDirectors(value: MovieFilters["directors"]) {
+  draft.directors = value;
+}
+function setCompanies(value: MovieFilters["includeCompanies"]) {
+  draft.includeCompanies = value;
 }
 function genreLabel(genre: FilterOption) {
   const state = genreState(draft, genre.id);
@@ -234,6 +245,47 @@ function apply() {
               :label="t('excludeKeywords')"
               :placeholder="t('searchKeywords')"
               @update:model-value="setExcludedKeywords"
+            />
+          </div>
+        </fieldset>
+        <fieldset
+          v-if="mediaType === 'movie'"
+          class="filter-card keyword-card compact-keyword-card people-filter-card"
+        >
+          <legend>
+            <AppIcon name="users" /><b>{{ t("people") }}</b>
+          </legend>
+          <div class="keyword-filter-fields">
+            <PersonTagInput
+              id="cast"
+              :model-value="draft.cast"
+              :label="t('cast')"
+              :placeholder="t('searchPeople')"
+              @update:model-value="setCast"
+            />
+            <PersonTagInput
+              id="directors"
+              :model-value="draft.directors"
+              :label="t('directors')"
+              :placeholder="t('searchPeople')"
+              @update:model-value="setDirectors"
+            />
+          </div>
+        </fieldset>
+        <fieldset
+          v-if="mediaType === 'movie'"
+          class="filter-card keyword-card compact-keyword-card company-filter-card"
+        >
+          <legend>
+            <AppIcon name="building" /><b>{{ t("productionCompanies") }}</b>
+          </legend>
+          <div class="keyword-filter-fields">
+            <CompanyTagInput
+              id="companies"
+              :model-value="draft.includeCompanies"
+              :label="t('productionCompany')"
+              :placeholder="t('searchCompanies')"
+              @update:model-value="setCompanies"
             />
           </div>
         </fieldset>

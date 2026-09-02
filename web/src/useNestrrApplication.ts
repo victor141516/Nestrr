@@ -79,6 +79,7 @@ export function useNestrrApplication() {
       pathOnly.value === "/" ||
       pathOnly.value === "/library" ||
       pathOnly.value === "/lists" ||
+      pathOnly.value === "/recommendations" ||
       pathOnly.value === "/settings" ||
       pathOnly.value === "/admin" ||
       /^\/lists\/\d+$/.test(pathOnly.value) ||
@@ -246,6 +247,8 @@ export function useNestrrApplication() {
     impersonate,
     loadAdmin,
     openAdminAction,
+    recommendationRun,
+    runRecommendationCatalog,
     stopImpersonation,
     users,
   } = useAdministration({
@@ -295,13 +298,15 @@ export function useNestrrApplication() {
             ? activeList.value?.systemKey
               ? systemListName(activeList.value.systemKey)
               : activeList.value?.name || t("lists")
-            : pathOnly.value === "/settings"
-              ? t("settings")
-              : pathOnly.value === "/admin"
-                ? t("admin")
-                : validRoute.value
-                  ? ""
-                  : t("pageNotFound");
+            : pathOnly.value === "/recommendations"
+              ? t("recommendations")
+              : pathOnly.value === "/settings"
+                ? t("settings")
+                : pathOnly.value === "/admin"
+                  ? t("admin")
+                  : validRoute.value
+                    ? ""
+                    : t("pageNotFound");
     return page ? `${page} · Nestrr` : "Nestrr";
   });
 
@@ -368,7 +373,8 @@ export function useNestrrApplication() {
       else if (path === "/library") await loadLibrary();
       else if (path === "/lists" || /^\/lists\/\d+$/.test(path))
         await loadListsPage(path);
-      else if (path === "/settings") {
+      else if (path === "/recommendations") {
+      } else if (path === "/settings") {
       } else if (path === "/admin") await loadAdmin();
       else if (
         path.startsWith("/movie/") ||
@@ -426,6 +432,7 @@ export function useNestrrApplication() {
     cancelAutoplay,
     categories,
     changeExploreSort,
+    checkCards,
     clearMetadata,
     confirmAdminAction,
     confirmMetadata,
@@ -480,6 +487,8 @@ export function useNestrrApplication() {
     onSeasonToggle,
     onTorrentAccepted,
     openAdminAction,
+    recommendationRun,
+    runRecommendationCatalog,
     openMovieFilters,
     openTorrent,
     pageLoading,

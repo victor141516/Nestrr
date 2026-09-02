@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import type { TranslationKey } from "./i18n";
 import type { ExploreSort } from "./downloadedExplore";
 import AppIcon from "./AppIcon.vue";
+import AppSelect from "./AppSelect.vue";
 
 const props = defineProps<{
   searchType: "movie" | "tv";
@@ -14,12 +16,18 @@ const props = defineProps<{
 
 const query = defineModel<string>("query", { required: true });
 const sort = defineModel<ExploreSort>("sort", { required: true });
+const sortOptions = computed(() => [
+  { value: "popularity" as const, label: props.translate("popularity") },
+  { value: "release" as const, label: props.translate("releaseDate") },
+  { value: "rating" as const, label: props.translate("rating") },
+  { value: "title" as const, label: props.translate("titleLabel") },
+]);
 
 const emit = defineEmits<{
   submit: [];
   selectType: [type: "movie" | "tv"];
   toggleFilters: [];
-  changeSort: [];
+  changeSort: [sort: ExploreSort];
   setDownloadedOnly: [value: boolean];
 }>();
 
@@ -76,15 +84,15 @@ function updateDownloadedOnly(event: Event): void {
       <AppIcon name="filter" />{{ translate("filters") }}
       <span v-if="movieFilterCount">{{ movieFilterCount }}</span>
     </button>
-    <label class="explore-sort-control explore-control">
+    <div class="explore-sort-control explore-control">
       <span>{{ translate("sortBy") }}</span>
-      <select v-model="sort" @change="emit('changeSort')">
-        <option value="popularity">{{ translate("popularity") }}</option>
-        <option value="release">{{ translate("releaseDate") }}</option>
-        <option value="rating">{{ translate("rating") }}</option>
-        <option value="title">{{ translate("titleLabel") }}</option>
-      </select>
-    </label>
+      <AppSelect
+        v-model="sort"
+        :label="translate('sortBy')"
+        :options="sortOptions"
+        @change="emit('changeSort', $event)"
+      />
+    </div>
     <label class="switch-label explore-control">
       <span>{{ translate("downloadedOnly") }}</span>
       <input

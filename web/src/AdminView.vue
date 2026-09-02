@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useNestrrApplicationContext } from "./useNestrrApplication";
 import AppIcon from "./AppIcon.vue";
+import RecommendationCatalogPanel from "./RecommendationCatalogPanel.vue";
 
 const {
   addUser,
@@ -12,6 +13,8 @@ const {
   integrationLabel,
   integrations,
   openAdminAction,
+  recommendationRun,
+  runRecommendationCatalog,
   t,
   users,
 } = useNestrrApplicationContext();
@@ -73,6 +76,12 @@ const {
         </div>
       </article>
     </section>
+    <RecommendationCatalogPanel
+      v-if="recommendationRun"
+      :status="recommendationRun"
+      :translate="t"
+      @run="runRecommendationCatalog"
+    />
     <section v-if="adminState" class="panel server-panel">
       <div class="section-heading">
         <div>

@@ -72,6 +72,59 @@ describe("useExplore downloaded dataset", () => {
     expect(explore.hasMoreSearchResults.value).toBe(false);
   });
 
+  it("hydrates sorting from the URL and writes later changes back to it", async () => {
+    vi.mocked(api).mockResolvedValue({
+      page: 1,
+      total_pages: 1,
+      total_results: 1,
+      results: [{ id: 5, title: "Recent film" }],
+    });
+    const route = reactive({
+      path: "/",
+      fullPath: "/?type=Movies&sort=release",
+      query: { type: "Movies", sort: "release" },
+    });
+    const router = {
+      resolve: vi.fn((target: { query: Record<string, string> }) => ({
+        fullPath: `/?${new URLSearchParams(target.query).toString()}`,
+      })),
+      push: vi.fn(),
+    };
+    let explore!: ReturnType<typeof useExplore>;
+    const Harness = defineComponent({
+      setup() {
+        explore = useExplore({
+          router: router as any,
+          currentRoute: route as any,
+          pathOnly: ref("/") as any,
+          busy: ref(false),
+          error: ref(""),
+          availability: reactive({}),
+          checkCards: vi.fn(),
+          rottenTomatoesEnabled: ref(false),
+          t: (key) => key,
+          title: (media) => media.title || media.name || "",
+        });
+        return () => null;
+      },
+    });
+    render(Harness);
+
+    await explore.loadExploreFromURL();
+
+    expect(explore.exploreSort.value).toBe("release");
+    expect(api).toHaveBeenCalledWith(
+      expect.stringContaining("sort_by=primary_release_date.desc"),
+    );
+
+    await explore.changeExploreSort("rating");
+
+    expect(router.push).toHaveBeenCalledWith({
+      path: "/",
+      query: { type: "Movies", sort: "rating" },
+    });
+  });
+
   it("keeps the current grid mounted and serves cached media while revalidating", async () => {
     vi.useFakeTimers();
     const deferred = <T>() => {
@@ -222,5 +275,106 @@ describe("useExplore downloaded dataset", () => {
       .mocked(api)
       .mock.calls.find(([path]) => String(path).includes("/discover/movie"));
     expect(String(discoverCall?.[0])).not.toContain("rottenTomatoes");
+  });
+
+  it("intersects local people and company relations before the remote director result", async () => {
+    let resolveRemote!: (value: any) => void;
+    const remote = new Promise<any>((resolve) => {
+      resolveRemote = resolve;
+    });
+    vi.mocked(api).mockImplementation((path) => {
+      const requestPath = String(path);
+      if (requestPath.includes("/genre/movie/list"))
+        return Promise.resolve({ genres: [] });
+      if (requestPath.includes("/configuration/countries"))
+        return Promise.resolve([]);
+      if (requestPath.includes("/people/local-media"))
+        return Promise.resolve({
+          results: [
+            {
+              id: 10,
+              title: "Cached collaboration",
+              production_companies: [{ id: 40 }],
+            },
+            { id: 12, title: "Different company" },
+          ],
+        });
+      if (requestPath.includes("/companies/local-media"))
+        return Promise.resolve({
+          results: [
+            {
+              id: 10,
+              title: "Cached collaboration",
+              production_companies: [{ id: 40 }],
+            },
+          ],
+        });
+      if (requestPath.includes("/people/discover/movie")) return remote;
+      throw new Error(`Unexpected request: ${requestPath}`);
+    });
+    const route = reactive({
+      path: "/",
+      fullPath: "/?type=Movies&cast=20&directors=30&includeCompanies=40",
+      query: {
+        type: "Movies",
+        cast: "20",
+        castNames: '["Actor"]',
+        directors: "30",
+        directorNames: '["Director"]',
+        includeCompanies: "40",
+        companyNames: '["Studio"]',
+      },
+    });
+    let explore!: ReturnType<typeof useExplore>;
+    const Harness = defineComponent({
+      setup() {
+        explore = useExplore({
+          router: {
+            resolve: vi.fn(() => ({ fullPath: route.fullPath })),
+            push: vi.fn(),
+          } as any,
+          currentRoute: route as any,
+          pathOnly: ref("/") as any,
+          busy: ref(false),
+          error: ref(""),
+          availability: reactive({}),
+          checkCards: vi.fn(),
+          rottenTomatoesEnabled: ref(false),
+          t: (key) => key,
+          title: (media) => media.title || media.name || "",
+        });
+        return () => null;
+      },
+    });
+    render(Harness);
+
+    const loading = explore.loadExploreFromURL();
+    await vi.waitFor(() =>
+      expect(explore.visibleItems.value[0]?.title).toBe("Cached collaboration"),
+    );
+    const localCall = vi
+      .mocked(api)
+      .mock.calls.find(([path]) => String(path).includes("/local-media"));
+    expect(String(localCall?.[0])).toContain("cast=20");
+    expect(String(localCall?.[0])).toContain("directors=30");
+    const companyCall = vi
+      .mocked(api)
+      .mock.calls.find(([path]) => String(path).includes("/companies/local"));
+    expect(String(companyCall?.[0])).toContain("companies=40");
+    const remoteCall = vi
+      .mocked(api)
+      .mock.calls.find(([path]) => String(path).includes("/discover/movie"));
+    expect(String(remoteCall?.[0])).toContain("with_cast=20");
+    expect(String(remoteCall?.[0])).toContain("directors=30");
+    expect(String(remoteCall?.[0])).toContain("with_companies=40");
+
+    resolveRemote({
+      page: 1,
+      total_pages: 1,
+      total_results: 1,
+      results: [{ id: 11, title: "TMDB collaboration" }],
+    });
+    await loading;
+    expect(explore.visibleItems.value[0]?.title).toBe("TMDB collaboration");
   });
 });

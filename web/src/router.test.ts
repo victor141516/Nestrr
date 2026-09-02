@@ -9,6 +9,7 @@ describe("application routes", () => {
       "/library",
       "/lists",
       "/lists/:id(\\d+)",
+      "/recommendations",
       "/settings",
       "/admin",
       "/movie/:id(\\d+)",

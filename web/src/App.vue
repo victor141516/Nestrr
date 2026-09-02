@@ -112,6 +112,12 @@ const {
           :class="{ active: pathOnly.startsWith('/lists') }"
           to="/lists"
           ><AppIcon name="list" /><span>{{ t("lists") }}</span></RouterLink
+        ><RouterLink
+          :class="{ active: pathOnly === '/recommendations' }"
+          to="/recommendations"
+          ><AppIcon name="sparkles" /><span>{{
+            t("recommendations")
+          }}</span></RouterLink
         >
       </nav>
 

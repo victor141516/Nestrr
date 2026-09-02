@@ -15,6 +15,7 @@ import (
 	"github.com/victor141516/Nestrr/internal/keywords"
 	"github.com/victor141516/Nestrr/internal/media"
 	"github.com/victor141516/Nestrr/internal/ratings"
+	"github.com/victor141516/Nestrr/internal/recommendations"
 	"github.com/victor141516/Nestrr/internal/server"
 	"github.com/victor141516/Nestrr/internal/store"
 	"github.com/victor141516/Nestrr/internal/tmdb"
@@ -42,7 +43,10 @@ func main() {
 	keywordCatalog := keywords.New(cfg.KeywordCachePath, client, log)
 	keywordCatalog.Start(ctx)
 	ratingService := &ratings.Service{MDBListBaseURL: cfg.MDBListBaseURL, MDBListAPIKey: cfg.MDBListAPIKey, OMDbBaseURL: cfg.OMDbBaseURL, OMDbAPIKey: cfg.OMDbAPIKey, HTTP: client, Store: db, Log: log}
-	app := &server.Server{Config: cfg, Store: db, Auth: &auth.Manager{Store: db, Secret: []byte(cfg.JWTSecret), AccessTTL: cfg.AccessTTL, RefreshTTL: cfg.RefreshTTL}, TMDB: &tmdb.Client{BaseURL: cfg.TMDBBaseURL, Token: cfg.TMDBBearerToken, TTL: cfg.TMDBCacheTTL, HTTP: client, Store: db, Log: log}, Ratings: ratingService, Keywords: keywordCatalog, Media: media.Resolver{MoviesRoot: cfg.MovieLibraryRoot, ShowsRoot: cfg.ShowLibraryRoot}, Integrations: integration, Log: log, HTTP: client}
+	tmdbClient := &tmdb.Client{BaseURL: cfg.TMDBBaseURL, Token: cfg.TMDBBearerToken, TTL: cfg.TMDBCacheTTL, HTTP: client, Store: db, Log: log}
+	recommendationService := recommendations.New(db, tmdbClient, log)
+	recommendationService.Start(ctx)
+	app := &server.Server{Config: cfg, Store: db, Auth: &auth.Manager{Store: db, Secret: []byte(cfg.JWTSecret), AccessTTL: cfg.AccessTTL, RefreshTTL: cfg.RefreshTTL}, TMDB: tmdbClient, Ratings: ratingService, Recommendations: recommendationService, Keywords: keywordCatalog, Media: media.Resolver{MoviesRoot: cfg.MovieLibraryRoot, ShowsRoot: cfg.ShowLibraryRoot}, Integrations: integration, Log: log, HTTP: client}
 	srv := &http.Server{Addr: cfg.ListenAddr, Handler: app.Handler(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 90 * time.Second}
 	go func() {
 		log.Info("Nestrr listening", "address", cfg.ListenAddr, "publicOrigin", cfg.PublicOrigin)

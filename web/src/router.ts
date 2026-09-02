@@ -4,6 +4,7 @@ import ExploreView from "./ExploreView.vue";
 import ListsView from "./ListsView.vue";
 import MediaDetailView from "./MediaDetailView.vue";
 import NotFoundView from "./NotFoundView.vue";
+import RecommendationsView from "./RecommendationsView.vue";
 import SettingsView from "./SettingsView.vue";
 
 export const router = createRouter({
@@ -31,6 +32,7 @@ export const router = createRouter({
     },
     { path: "/lists", component: ListsView },
     { path: "/lists/:id(\\d+)", component: ListsView },
+    { path: "/recommendations", component: RecommendationsView },
     { path: "/settings", component: SettingsView },
     { path: "/admin", component: AdminView },
     { path: "/movie/:id(\\d+)", component: MediaDetailView },

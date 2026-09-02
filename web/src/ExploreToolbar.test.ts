@@ -38,6 +38,23 @@ describe("ExploreToolbar", () => {
     expect(view.emitted().setDownloadedOnly).toEqual([[true]]);
   });
 
+  it("uses the custom sort menu and emits its selection", async () => {
+    const view = render(ExploreToolbar, {
+      props,
+      global: { stubs: { AppIcon: true } },
+    });
+
+    await fireEvent.click(view.container.querySelector(".app-select-trigger")!);
+    await fireEvent.click(
+      view.container.querySelector(
+        '[role="menuitemradio"][data-value="release"]',
+      )!,
+    );
+
+    expect(view.emitted()["update:sort"]).toEqual([["release"]]);
+    expect(view.emitted().changeSort).toEqual([["release"]]);
+  });
+
   it("keeps the search action label stable during background loading", () => {
     const view = render(ExploreToolbar, {
       props: { ...props, query: "Dune", busy: true },

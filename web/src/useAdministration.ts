@@ -1,4 +1,4 @@
-import { ref, type Ref } from "vue";
+import { onBeforeUnmount, ref, type Ref } from "vue";
 import type { Router } from "vue-router";
 import { acceptTokens, api, session, type User } from "./api";
 import type { TranslationKey } from "./i18n";
@@ -12,24 +12,89 @@ type Options = {
   busy: Ref<boolean>;
 };
 
+type WorkProgress = {
+  total: number;
+  done: number;
+  found?: number;
+  added?: number;
+  failed: number;
+};
+
+export type RecommendationRunStatus = {
+  id?: number;
+  state: "idle" | "running" | "completed" | "failed";
+  phase: string;
+  startedAt?: string;
+  updatedAt?: string;
+  finishedAt?: string;
+  usersScanned: number;
+  signals: {
+    genres: number;
+    keywords: number;
+    actors: number;
+    directors: number;
+    companies: number;
+  };
+  discovery: WorkProgress;
+  hydration: WorkProgress;
+  catalogCount: number;
+  pending: number;
+  lastError?: string;
+};
+
 export function useAdministration(options: Options) {
   const { router, t, flash, loadRoute, go, busy } = options;
   const users = ref<User[]>([]);
   const adminState = ref<any>(null);
+  const recommendationRun = ref<RecommendationRunStatus | null>(null);
   const adminAction = ref<{
     type: "rename" | "reset" | "delete";
     user: User;
     value: string;
   } | null>(null);
   const confirmMetadata = ref(false);
+  let recommendationPoll: number | null = null;
+
+  function stopRecommendationPolling(): void {
+    if (recommendationPoll === null) return;
+    window.clearTimeout(recommendationPoll);
+    recommendationPoll = null;
+  }
+
+  function scheduleRecommendationPolling(): void {
+    stopRecommendationPolling();
+    if (recommendationRun.value?.state !== "running") return;
+    recommendationPoll = window.setTimeout(async () => {
+      recommendationPoll = null;
+      await loadRecommendationStatus();
+    }, 1000);
+  }
+
+  async function loadRecommendationStatus(): Promise<void> {
+    recommendationRun.value = await api<RecommendationRunStatus>(
+      "/admin/recommendations/catalog",
+    );
+    scheduleRecommendationPolling();
+  }
 
   async function loadAdmin() {
-    const [r, state] = await Promise.all([
+    const [r, state, recommendations] = await Promise.all([
       api<any>("/admin/users"),
       api<any>("/admin/state"),
+      api<RecommendationRunStatus>("/admin/recommendations/catalog"),
     ]);
     users.value = r.users;
     adminState.value = state;
+    recommendationRun.value = recommendations;
+    scheduleRecommendationPolling();
+  }
+
+  async function runRecommendationCatalog(): Promise<void> {
+    recommendationRun.value = await api<RecommendationRunStatus>(
+      "/admin/recommendations/catalog/run",
+      { method: "POST" },
+    );
+    scheduleRecommendationPolling();
   }
 
   async function clearMetadata() {
@@ -101,6 +166,8 @@ export function useAdministration(options: Options) {
     }
   }
 
+  onBeforeUnmount(stopRecommendationPolling);
+
   return {
     addUser,
     adminAction,
@@ -111,6 +178,8 @@ export function useAdministration(options: Options) {
     impersonate,
     loadAdmin,
     openAdminAction,
+    recommendationRun,
+    runRecommendationCatalog,
     stopImpersonation,
     users,
   };

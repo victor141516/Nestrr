@@ -3,6 +3,7 @@ import {
   normalizeMovieFilters,
   type MovieFilters,
 } from "./movieFilters";
+import type { ExploreSort } from "./downloadedExplore";
 
 export type ExploreKind = "movie" | "tv";
 export type ExploreURLState = {
@@ -10,6 +11,7 @@ export type ExploreURLState = {
   query: string;
   filters: MovieFilters | null;
   downloaded: boolean;
+  sort: ExploreSort;
 };
 
 function exploreKind(value: unknown): ExploreKind {
@@ -18,6 +20,12 @@ function exploreKind(value: unknown): ExploreKind {
   return normalized === "shows" || normalized === "show" || normalized === "tv"
     ? "tv"
     : "movie";
+}
+
+function exploreSort(value: unknown): ExploreSort {
+  return value === "release" || value === "rating" || value === "title"
+    ? value
+    : "popularity";
 }
 
 const numberOrNull = (value: unknown) => {
@@ -86,16 +94,22 @@ export function parseExploreQuery(
       query.includeCompanies,
       query.companyNames,
     ),
+    cast: kind === "movie" ? namedOptionList(query.cast, query.castNames) : [],
+    directors:
+      kind === "movie"
+        ? namedOptionList(query.directors, query.directorNames)
+        : [],
     productionCountries: list(query.countries),
   });
   const hasFilters = Object.keys(query).some(
-    (key) => !["type", "q", "downloaded"].includes(key),
+    (key) => !["type", "q", "downloaded", "sort"].includes(key),
   );
   return {
     kind,
     query: typeof query.q === "string" ? query.q : "",
     filters: hasFilters ? filters : null,
     downloaded: query.downloaded === "1",
+    sort: exploreSort(query.sort),
   };
 }
 
@@ -104,12 +118,14 @@ export function exploreQuery(
   query: string,
   filters: MovieFilters | null,
   downloaded = false,
+  sort: ExploreSort = "popularity",
 ) {
   const result: Record<string, string> = {
     type: kind === "tv" ? "Shows" : "Movies",
   };
   if (query.trim()) result.q = query.trim();
   if (downloaded) result.downloaded = "1";
+  if (sort !== "popularity") result.sort = sort;
   if (!filters) return result;
   const f = normalizeMovieFilters(filters);
   const put = (key: string, value: number | null) => {
@@ -143,6 +159,16 @@ export function exploreQuery(
       .join(",");
     result.companyNames = JSON.stringify(
       f.includeCompanies.map((company) => company.name),
+    );
+  }
+  if (kind === "movie" && f.cast.length) {
+    result.cast = f.cast.map((person) => person.id).join(",");
+    result.castNames = JSON.stringify(f.cast.map((person) => person.name));
+  }
+  if (kind === "movie" && f.directors.length) {
+    result.directors = f.directors.map((person) => person.id).join(",");
+    result.directorNames = JSON.stringify(
+      f.directors.map((person) => person.name),
     );
   }
   if (f.productionCountries.length)

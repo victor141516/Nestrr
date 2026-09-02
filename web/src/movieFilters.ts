@@ -12,6 +12,8 @@ export type MovieFilters = {
   includeKeywords: KeywordOption[];
   excludeKeywords: KeywordOption[];
   includeCompanies: FilterOption[];
+  cast: PersonOption[];
+  directors: PersonOption[];
   productionCountries: string[];
   ageMin: number | null;
   ageMax: number | null;
@@ -19,6 +21,10 @@ export type MovieFilters = {
 
 export type FilterOption = { id: number; name: string };
 export type KeywordOption = FilterOption;
+export type PersonOption = FilterOption & {
+  profilePath?: string;
+  knownForDepartment?: string;
+};
 export type CountryOption = {
   iso_3166_1: string;
   english_name: string;
@@ -135,6 +141,8 @@ export function createMovieFilters(_language = "en-US"): MovieFilters {
     includeKeywords: [],
     excludeKeywords: [],
     includeCompanies: [],
+    cast: [],
+    directors: [],
     productionCountries: [],
     ageMin: null,
     ageMax: null,
@@ -151,6 +159,8 @@ export function cloneMovieFilters(filters: MovieFilters): MovieFilters {
     includeCompanies: filters.includeCompanies.map((company) => ({
       ...company,
     })),
+    cast: filters.cast.map((person) => ({ ...person })),
+    directors: filters.directors.map((person) => ({ ...person })),
     productionCountries: [...filters.productionCountries],
   };
 }
@@ -243,6 +253,8 @@ export function normalizeMovieFilters(filters: MovieFilters): MovieFilters {
     (keyword) => !excludedKeywordIDs.has(keyword.id),
   );
   copy.includeCompanies = normalizeKeywords(copy.includeCompanies);
+  copy.cast = normalizeKeywords(copy.cast);
+  copy.directors = normalizeKeywords(copy.directors);
   copy.productionCountries = [
     ...new Set(copy.productionCountries.filter(Boolean)),
   ];
@@ -263,6 +275,8 @@ export function activeMovieFilterCount(filters: MovieFilters | null) {
     Number(filters.includeKeywords.length > 0) +
     Number(filters.excludeKeywords.length > 0) +
     Number(filters.includeCompanies.length > 0) +
+    Number(filters.cast.length > 0) +
+    Number(filters.directors.length > 0) +
     Number(filters.productionCountries.length > 0) +
     Number(filters.ageMin !== null || filters.ageMax !== null)
   );
@@ -329,6 +343,16 @@ export function discoverParams(
     params.set(
       "with_companies",
       normalized.includeCompanies.map((company) => company.id).join(","),
+    );
+  if (kind === "movie" && normalized.cast.length)
+    params.set(
+      "with_cast",
+      normalized.cast.map((person) => person.id).join(","),
+    );
+  if (kind === "movie" && normalized.directors.length)
+    params.set(
+      "directors",
+      normalized.directors.map((person) => person.id).join(","),
     );
   if (normalized.productionCountries.length) {
     const countryCodes = [

@@ -1,6 +1,7 @@
 import { computed, ref, shallowRef, type ComputedRef, type Ref } from "vue";
 import type { RouteLocationNormalizedLoaded, Router } from "vue-router";
 import { api, session } from "./api";
+import { resolveCompanies } from "./companyCatalog";
 import {
   downloadedFiltersNeedDetails,
   downloadedMediaFromLibrary,
@@ -13,6 +14,7 @@ import {
 import { exploreQuery, parseExploreQuery } from "./discoverState";
 import type { TranslationKey } from "./i18n";
 import { resolveKeywords } from "./keywordCatalog";
+import { resolvePeople } from "./personCatalog";
 import {
   activeMovieFilterCount,
   cloneMovieFilters,
@@ -199,6 +201,16 @@ export function useExplore(options: UseExploreOptions) {
         group: "country",
         label: `${t("productionCountry")}: ${filters.productionCountries.map(countryName).join(", ")}`,
       });
+    if (filters.cast.length)
+      chips.push({
+        group: "cast",
+        label: `${t("cast")}: ${filters.cast.map((person) => person.name).join(", ")}`,
+      });
+    if (filters.directors.length)
+      chips.push({
+        group: "directors",
+        label: `${t("directors")}: ${filters.directors.map((person) => person.name).join(", ")}`,
+      });
     return chips;
   });
 
@@ -214,6 +226,10 @@ export function useExplore(options: UseExploreOptions) {
           ),
           includeCompanies: appliedMovieFilters.value.includeCompanies.map(
             (company) => company.id,
+          ),
+          cast: appliedMovieFilters.value.cast.map((person) => person.id),
+          directors: appliedMovieFilters.value.directors.map(
+            (person) => person.id,
           ),
         }
       : null;
@@ -346,6 +362,19 @@ export function useExplore(options: UseExploreOptions) {
     if (!exploreRequests.isLatest(request)) return null;
     let next = downloadedMediaFromLibrary(response.items || [], kind);
     const filters = appliedMovieFilters.value;
+    if (
+      kind === "movie" &&
+      filters &&
+      (filters.cast.length || filters.directors.length)
+    ) {
+      const params = peopleFilterParams(filters);
+      const local = await api<{ results?: ExploreMedia[] }>(
+        `/people/local-media?${params}`,
+      );
+      if (!exploreRequests.isLatest(request)) return null;
+      const matching = new Set((local.results || []).map((item) => item.id));
+      next = next.filter((item) => matching.has(item.id));
+    }
     if (downloadedFiltersNeedDetails(filters)) {
       const suffix = [
         kind === "movie" ? "release_dates" : "content_ratings",
@@ -404,7 +433,13 @@ export function useExplore(options: UseExploreOptions) {
   async function doSearch() {
     if (!query.value.trim()) return;
     await navigateExplore(
-      exploreQuery(searchType.value, query.value, null, downloadedOnly.value),
+      exploreQuery(
+        searchType.value,
+        query.value,
+        null,
+        downloadedOnly.value,
+        exploreSort.value,
+      ),
     );
   }
   async function loadMovieFilterOptions() {
@@ -503,7 +538,11 @@ export function useExplore(options: UseExploreOptions) {
             : "popularity.desc",
     );
     if (exploreSort.value === "rating") params.set("vote_count.gte", "100");
-    const r = await api<any>(`/catalog/discover/${kind}?${params}`);
+    const endpoint =
+      kind === "movie" && filters.directors.length
+        ? "/people/discover/movie"
+        : `/catalog/discover/${kind}`;
+    const r = await api<any>(`${endpoint}?${params}`);
     if (!exploreRequests.isLatest(request)) return null;
     const raw = (r.results || []).map((x: any) => ({
       ...x,
@@ -521,6 +560,82 @@ export function useExplore(options: UseExploreOptions) {
       totalResults: Number(r.total_results) || next.length,
     };
   }
+
+  function peopleFilterParams(filters: MovieFilters) {
+    const params = new URLSearchParams();
+    if (filters.cast.length)
+      params.set("cast", filters.cast.map((person) => person.id).join(","));
+    if (filters.directors.length)
+      params.set(
+        "directors",
+        filters.directors.map((person) => person.id).join(","),
+      );
+    return params;
+  }
+
+  function companyFilterParams(filters: MovieFilters) {
+    return new URLSearchParams({
+      companies: filters.includeCompanies
+        .map((company) => company.id)
+        .join(","),
+    });
+  }
+
+  async function fetchLocalRelatedMedia(filters: MovieFilters) {
+    const requests: Promise<{ results?: DownloadedExploreMedia[] }>[] = [];
+    if (filters.cast.length || filters.directors.length)
+      requests.push(
+        api<{ results?: DownloadedExploreMedia[] }>(
+          `/people/local-media?${peopleFilterParams(filters)}`,
+        ),
+      );
+    if (filters.includeCompanies.length)
+      requests.push(
+        api<{ results?: DownloadedExploreMedia[] }>(
+          `/companies/local-media?${companyFilterParams(filters)}`,
+        ),
+      );
+    if (!requests.length) return null;
+    const groups = (await Promise.all(requests)).map(
+      (response) => response.results || [],
+    );
+    const [initial, ...remaining] = groups;
+    if (!initial) return [];
+    const first = new Map(initial.map((item) => [item.id, item]));
+    for (const group of remaining) {
+      const ids = new Set(group.map((item) => item.id));
+      for (const id of first.keys()) if (!ids.has(id)) first.delete(id);
+    }
+    return [...first.values()];
+  }
+
+  async function fetchLocalRelationPreview(
+    request: number,
+  ): Promise<ExploreResultSet | null> {
+    const filters = appliedMovieFilters.value;
+    if (
+      !filters ||
+      searchType.value !== "movie" ||
+      (!filters.cast.length &&
+        !filters.directors.length &&
+        !filters.includeCompanies.length)
+    )
+      return null;
+    const related = await fetchLocalRelatedMedia(filters);
+    if (!exploreRequests.isLatest(request)) return null;
+    const items = sortDownloadedMedia(
+      (related || [])
+        .map((item) => ({ ...item, media_type: "movie" }))
+        .filter((item) => matchesDownloadedMedia(item, "", filters)),
+      exploreSort.value,
+    );
+    return {
+      items,
+      page: 1,
+      totalPages: 1,
+      totalResults: items.length,
+    };
+  }
   async function applyMovieFilters(filters: MovieFilters) {
     movieFilterDraft.value = normalizeMovieFilters(filters);
     await navigateExplore(
@@ -529,6 +644,7 @@ export function useExplore(options: UseExploreOptions) {
         "",
         movieFilterDraft.value,
         downloadedOnly.value,
+        exploreSort.value,
       ),
     );
   }
@@ -537,7 +653,13 @@ export function useExplore(options: UseExploreOptions) {
   ) {
     movieFilterDraft.value = cloneMovieFilters(filters);
     await navigateExplore(
-      exploreQuery(searchType.value, "", null, downloadedOnly.value),
+      exploreQuery(
+        searchType.value,
+        "",
+        null,
+        downloadedOnly.value,
+        exploreSort.value,
+      ),
     );
   }
   async function removeMovieFilter(group: string) {
@@ -569,12 +691,15 @@ export function useExplore(options: UseExploreOptions) {
     if (group === "excludeKeywords") next.excludeKeywords = [];
     if (group === "company") next.includeCompanies = [];
     if (group === "country") next.productionCountries = [];
+    if (group === "cast") next.cast = [];
+    if (group === "directors") next.directors = [];
     await navigateExplore(
       exploreQuery(
         searchType.value,
         "",
         activeMovieFilterCount(next) ? next : null,
         downloadedOnly.value,
+        exploreSort.value,
       ),
     );
   }
@@ -588,6 +713,7 @@ export function useExplore(options: UseExploreOptions) {
     searchType.value = state.kind;
     query.value = state.query;
     downloadedOnly.value = state.downloaded;
+    exploreSort.value = state.sort;
     if (state.filters && !rottenTomatoesEnabled.value) {
       state.filters.rottenTomatoesMin = null;
       state.filters.rottenTomatoesMax = null;
@@ -599,7 +725,11 @@ export function useExplore(options: UseExploreOptions) {
     movieFilterDraft.value = cloneMovieFilters(
       state.filters || createMovieFilters(session.user?.language),
     );
-    if (state.filters) void hydrateKeywordNames(state.filters, request);
+    if (state.filters) {
+      void hydrateKeywordNames(state.filters, request);
+      void hydratePersonNames(state.filters, request);
+      void hydrateCompanyNames(state.filters, request);
+    }
     searchStarted.value = Boolean(state.query || state.filters);
     searchMode.value = state.query
       ? "text"
@@ -626,6 +756,14 @@ export function useExplore(options: UseExploreOptions) {
         if (!exploreRequests.isLatest(request)) return;
         commitResult(cached);
         resultsTransitioning.value = false;
+      } else if (!downloadedOnly.value && searchMode.value === "filters") {
+        const localPreview = await fetchLocalRelationPreview(request).catch(
+          () => null,
+        );
+        if (localPreview?.items.length && exploreRequests.isLatest(request)) {
+          commitResult(localPreview);
+          resultsTransitioning.value = false;
+        }
       }
 
       const fresh = await freshResult;
@@ -676,6 +814,67 @@ export function useExplore(options: UseExploreOptions) {
       // Filtering still works from IDs when the local catalog is unavailable.
     }
   }
+
+  async function hydratePersonNames(filters: MovieFilters, request: number) {
+    const people = [...filters.cast, ...filters.directors];
+    const unresolved = people.filter(
+      (person) => person.name === String(person.id),
+    );
+    if (!unresolved.length) return;
+    try {
+      const resolved = await resolvePeople(
+        unresolved.map((person) => person.id),
+      );
+      if (!exploreRequests.isLatest(request)) return;
+      const names = new Map(resolved.map((person) => [person.id, person.name]));
+      const hydrate = (source: MovieFilters) => {
+        const next = cloneMovieFilters(source);
+        next.cast = next.cast.map((person) => ({
+          ...person,
+          name: names.get(person.id) || person.name,
+        }));
+        next.directors = next.directors.map((person) => ({
+          ...person,
+          name: names.get(person.id) || person.name,
+        }));
+        return next;
+      };
+      if (appliedMovieFilters.value)
+        appliedMovieFilters.value = hydrate(appliedMovieFilters.value);
+      movieFilterDraft.value = hydrate(movieFilterDraft.value);
+    } catch {
+      // IDs still filter correctly when their local labels are unavailable.
+    }
+  }
+
+  async function hydrateCompanyNames(filters: MovieFilters, request: number) {
+    const unresolved = filters.includeCompanies.filter(
+      (company) => company.name === String(company.id),
+    );
+    if (!unresolved.length) return;
+    try {
+      const resolved = await resolveCompanies(
+        unresolved.map((company) => company.id),
+      );
+      if (!exploreRequests.isLatest(request)) return;
+      const names = new Map(
+        resolved.map((company) => [company.id, company.name]),
+      );
+      const hydrate = (source: MovieFilters) => {
+        const next = cloneMovieFilters(source);
+        next.includeCompanies = next.includeCompanies.map((company) => ({
+          ...company,
+          name: names.get(company.id) || company.name,
+        }));
+        return next;
+      };
+      if (appliedMovieFilters.value)
+        appliedMovieFilters.value = hydrate(appliedMovieFilters.value);
+      movieFilterDraft.value = hydrate(movieFilterDraft.value);
+    } catch {
+      // Company IDs still filter correctly if their labels are unavailable.
+    }
+  }
   async function loadMoreSearchResults() {
     if (!hasMoreSearchResults.value || busy.value || loadingMore.value) return;
     const request = exploreRequests.begin();
@@ -705,6 +904,9 @@ export function useExplore(options: UseExploreOptions) {
     if (type === "tv" && filters) {
       filters.runtimeMin = null;
       filters.runtimeMax = null;
+      filters.cast = [];
+      filters.directors = [];
+      filters.includeCompanies = [];
     }
     if (mediaTypeChanged && filters) {
       // TMDB assigns different genre IDs to movies and TV. Keeping the old IDs
@@ -718,6 +920,7 @@ export function useExplore(options: UseExploreOptions) {
         searchMode.value === "text" ? query.value : "",
         searchMode.value === "filters" ? filters : null,
         downloadedOnly.value,
+        exploreSort.value,
       ),
     );
   }
@@ -730,6 +933,7 @@ export function useExplore(options: UseExploreOptions) {
         searchMode.value === "text" ? query.value : "",
         searchMode.value === "filters" ? appliedMovieFilters.value : null,
         value,
+        exploreSort.value,
       ),
     );
   }
@@ -762,51 +966,18 @@ export function useExplore(options: UseExploreOptions) {
   function sortTextResults() {
     items.value = sortTextMedia(items.value);
   }
-  async function changeExploreSort() {
+  async function changeExploreSort(nextSort: ExploreSort) {
     loadingMore.value = false;
-    if (downloadedOnly.value) {
-      items.value = sortDownloadedMedia(items.value, exploreSort.value);
-      cacheResult(resultCacheKey(), resultSetWithCurrentItems());
-      return;
-    }
-    if (searchMode.value === "text") {
-      sortTextResults();
-      cacheResult(resultCacheKey(), resultSetWithCurrentItems());
-      return;
-    }
-    const request = exploreRequests.begin();
-    const fade = waitForResultFade();
-    if (searchMode.value === "filters") {
-      busy.value = true;
-      try {
-        const next = await fetchFiltered(request, 1);
-        if (!next || !exploreRequests.isLatest(request)) return;
-        await fade;
-        if (!exploreRequests.isLatest(request)) return;
-        commitResult(next);
-        cacheResult(resultCacheKey(), next);
-      } finally {
-        if (exploreRequests.isLatest(request)) {
-          busy.value = false;
-          resultsTransitioning.value = false;
-        }
-      }
-    } else {
-      busy.value = true;
-      try {
-        const next = await fetchDiscovery(request, 1);
-        if (!next || !exploreRequests.isLatest(request)) return;
-        await fade;
-        if (!exploreRequests.isLatest(request)) return;
-        commitResult(next);
-        cacheResult(resultCacheKey(), next);
-      } finally {
-        if (exploreRequests.isLatest(request)) {
-          busy.value = false;
-          resultsTransitioning.value = false;
-        }
-      }
-    }
+    exploreSort.value = nextSort;
+    await navigateExplore(
+      exploreQuery(
+        searchType.value,
+        searchMode.value === "text" ? query.value : "",
+        searchMode.value === "filters" ? appliedMovieFilters.value : null,
+        downloadedOnly.value,
+        nextSort,
+      ),
+    );
   }
   function maybeLoadMore() {
     if (

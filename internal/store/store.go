@@ -83,6 +83,80 @@ CREATE TABLE IF NOT EXISTS metadata (
  updated_at TEXT NOT NULL,
  PRIMARY KEY(user_id,media_type,tmdb_id,language)
 );
+CREATE TABLE IF NOT EXISTS people (
+ tmdb_id INTEGER PRIMARY KEY,
+ name TEXT NOT NULL,
+ normalized_name TEXT NOT NULL,
+ profile_path TEXT NOT NULL DEFAULT '',
+ known_for_department TEXT NOT NULL DEFAULT '',
+ popularity REAL NOT NULL DEFAULT 0,
+ adult INTEGER NOT NULL DEFAULT 0,
+ updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS people_normalized_name ON people(normalized_name);
+CREATE TABLE IF NOT EXISTS media_credits (
+ media_type TEXT NOT NULL,
+ media_tmdb_id INTEGER NOT NULL,
+ credit_key TEXT NOT NULL,
+ person_tmdb_id INTEGER NOT NULL REFERENCES people(tmdb_id) ON DELETE CASCADE,
+ credit_kind TEXT NOT NULL,
+ department TEXT NOT NULL DEFAULT '',
+ job TEXT NOT NULL DEFAULT '',
+ character_name TEXT NOT NULL DEFAULT '',
+ billing_order INTEGER NOT NULL DEFAULT 0,
+ updated_at TEXT NOT NULL,
+ PRIMARY KEY(media_type,media_tmdb_id,credit_key)
+);
+CREATE INDEX IF NOT EXISTS media_credits_person ON media_credits(person_tmdb_id,media_type,credit_kind,job,media_tmdb_id);
+CREATE INDEX IF NOT EXISTS media_credits_media ON media_credits(media_type,media_tmdb_id);
+CREATE TABLE IF NOT EXISTS person_searches (
+ normalized_query TEXT NOT NULL,
+ language TEXT NOT NULL,
+ fetched_at TEXT NOT NULL,
+ PRIMARY KEY(normalized_query,language)
+);
+CREATE TABLE IF NOT EXISTS person_search_results (
+ normalized_query TEXT NOT NULL,
+ language TEXT NOT NULL,
+ person_tmdb_id INTEGER NOT NULL REFERENCES people(tmdb_id) ON DELETE CASCADE,
+ result_order INTEGER NOT NULL,
+ PRIMARY KEY(normalized_query,language,person_tmdb_id),
+ FOREIGN KEY(normalized_query,language) REFERENCES person_searches(normalized_query,language) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS person_search_results_order ON person_search_results(normalized_query,language,result_order);
+CREATE TABLE IF NOT EXISTS companies (
+ tmdb_id INTEGER PRIMARY KEY,
+ name TEXT NOT NULL,
+ normalized_name TEXT NOT NULL,
+ logo_path TEXT NOT NULL DEFAULT '',
+ origin_country TEXT NOT NULL DEFAULT '',
+ updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS companies_normalized_name ON companies(normalized_name);
+CREATE TABLE IF NOT EXISTS media_companies (
+ media_type TEXT NOT NULL,
+ media_tmdb_id INTEGER NOT NULL,
+ company_tmdb_id INTEGER NOT NULL REFERENCES companies(tmdb_id) ON DELETE CASCADE,
+ updated_at TEXT NOT NULL,
+ PRIMARY KEY(media_type,media_tmdb_id,company_tmdb_id)
+);
+CREATE INDEX IF NOT EXISTS media_companies_company ON media_companies(company_tmdb_id,media_type,media_tmdb_id);
+CREATE INDEX IF NOT EXISTS media_companies_media ON media_companies(media_type,media_tmdb_id);
+CREATE TABLE IF NOT EXISTS company_searches (
+ normalized_query TEXT NOT NULL,
+ language TEXT NOT NULL,
+ fetched_at TEXT NOT NULL,
+ PRIMARY KEY(normalized_query,language)
+);
+CREATE TABLE IF NOT EXISTS company_search_results (
+ normalized_query TEXT NOT NULL,
+ language TEXT NOT NULL,
+ company_tmdb_id INTEGER NOT NULL REFERENCES companies(tmdb_id) ON DELETE CASCADE,
+ result_order INTEGER NOT NULL,
+ PRIMARY KEY(normalized_query,language,company_tmdb_id),
+ FOREIGN KEY(normalized_query,language) REFERENCES company_searches(normalized_query,language) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS company_search_results_order ON company_search_results(normalized_query,language,result_order);
 CREATE TABLE IF NOT EXISTS external_ratings (
  media_type TEXT NOT NULL,
  tmdb_id INTEGER NOT NULL,
@@ -165,6 +239,52 @@ CREATE TABLE IF NOT EXISTS torrent_associations (
  category TEXT NOT NULL,
  created_at TEXT NOT NULL,
  PRIMARY KEY(user_id,media_type,tmdb_id,info_hash)
+);
+CREATE TABLE IF NOT EXISTS catalog_media (
+ media_type TEXT NOT NULL CHECK(media_type IN ('movie','tv')),
+ tmdb_id INTEGER NOT NULL,
+ payload BLOB NOT NULL,
+ features BLOB NOT NULL,
+ title TEXT NOT NULL DEFAULT '',
+ original_title TEXT NOT NULL DEFAULT '',
+ overview TEXT NOT NULL DEFAULT '',
+ poster_path TEXT NOT NULL DEFAULT '',
+ backdrop_path TEXT NOT NULL DEFAULT '',
+ release_date TEXT NOT NULL DEFAULT '',
+ vote_average REAL NOT NULL DEFAULT 0,
+ vote_count INTEGER NOT NULL DEFAULT 0,
+ popularity REAL NOT NULL DEFAULT 0,
+ updated_at TEXT NOT NULL,
+ PRIMARY KEY(media_type,tmdb_id)
+);
+CREATE INDEX IF NOT EXISTS catalog_media_rating ON catalog_media(media_type,vote_average DESC,vote_count DESC);
+CREATE TABLE IF NOT EXISTS recommendation_candidates (
+ media_type TEXT NOT NULL CHECK(media_type IN ('movie','tv')),
+ tmdb_id INTEGER NOT NULL,
+ status TEXT NOT NULL DEFAULT 'pending',
+ attempts INTEGER NOT NULL DEFAULT 0,
+ last_error TEXT NOT NULL DEFAULT '',
+ discovered_at TEXT NOT NULL,
+ updated_at TEXT NOT NULL,
+ PRIMARY KEY(media_type,tmdb_id)
+);
+CREATE INDEX IF NOT EXISTS recommendation_candidates_status ON recommendation_candidates(status,attempts,discovered_at);
+CREATE TABLE IF NOT EXISTS recommendation_discovery_cursors (
+ media_type TEXT NOT NULL CHECK(media_type IN ('movie','tv')),
+ signal_type TEXT NOT NULL,
+ signal_id INTEGER NOT NULL,
+ sort_by TEXT NOT NULL,
+ next_page INTEGER NOT NULL DEFAULT 1,
+ updated_at TEXT NOT NULL,
+ PRIMARY KEY(media_type,signal_type,signal_id,sort_by)
+);
+CREATE TABLE IF NOT EXISTS recommendation_runs (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ state TEXT NOT NULL,
+ payload BLOB NOT NULL,
+ started_at TEXT NOT NULL,
+ updated_at TEXT NOT NULL,
+ finished_at TEXT
 );
 CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `
@@ -1110,7 +1230,7 @@ func boolInt(v bool) int {
 }
 func (s *Store) DebugCounts(ctx context.Context) (map[string]int, error) {
 	out := map[string]int{}
-	for _, t := range []string{"users", "metadata", "external_ratings", "image_assets", "http_cache", "availability", "progress", "media_lists", "media_list_items", "torrent_associations"} {
+	for _, t := range []string{"users", "metadata", "people", "media_credits", "person_searches", "person_search_results", "companies", "media_companies", "company_searches", "company_search_results", "external_ratings", "image_assets", "http_cache", "availability", "progress", "media_lists", "media_list_items", "torrent_associations", "catalog_media", "recommendation_candidates", "recommendation_discovery_cursors", "recommendation_runs"} {
 		var n int
 		if err := s.DB.QueryRowContext(ctx, fmt.Sprintf("SELECT count(*) FROM %s", t)).Scan(&n); err != nil {
 			return nil, err

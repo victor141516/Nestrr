@@ -30,21 +30,23 @@ import (
 	"github.com/victor141516/Nestrr/internal/keywords"
 	"github.com/victor141516/Nestrr/internal/media"
 	"github.com/victor141516/Nestrr/internal/ratings"
+	"github.com/victor141516/Nestrr/internal/recommendations"
 	"github.com/victor141516/Nestrr/internal/store"
 	"github.com/victor141516/Nestrr/internal/tmdb"
 )
 
 type Server struct {
-	Config       config.Config
-	Store        *store.Store
-	Auth         *auth.Manager
-	TMDB         *tmdb.Client
-	Ratings      *ratings.Service
-	Keywords     *keywords.Catalog
-	Media        media.Resolver
-	Integrations *integrations.Manager
-	Log          *slog.Logger
-	HTTP         *http.Client
+	Config          config.Config
+	Store           *store.Store
+	Auth            *auth.Manager
+	TMDB            *tmdb.Client
+	Ratings         *ratings.Service
+	Recommendations *recommendations.Service
+	Keywords        *keywords.Catalog
+	Media           media.Resolver
+	Integrations    *integrations.Manager
+	Log             *slog.Logger
+	HTTP            *http.Client
 }
 type contextKey string
 
@@ -75,9 +77,17 @@ func (s *Server) Handler() http.Handler {
 			r.Post("/users/{id}/impersonate", s.impersonate)
 			r.Post("/impersonation/stop", s.stopImpersonation)
 			r.Get("/state", s.adminState)
+			r.Get("/recommendations/catalog", s.recommendationCatalogStatus)
+			r.Post("/recommendations/catalog/run", s.runRecommendationCatalog)
 		})
 		r.Get("/api/v1/catalog/*", s.catalog)
+		r.Get("/api/v1/recommendations", s.recommendations)
 		r.Get("/api/v1/keywords/search", s.keywordSearch)
+		r.Get("/api/v1/people/search", s.peopleSearch)
+		r.Get("/api/v1/people/local-media", s.localMediaByPeople)
+		r.Get("/api/v1/people/discover/movie", s.discoverMoviesByPeople)
+		r.Get("/api/v1/companies/search", s.companySearch)
+		r.Get("/api/v1/companies/local-media", s.localMediaByCompanies)
 		r.Get("/api/v1/images/{asset}", s.image)
 		r.Post("/api/v1/availability/check", s.checkAvailability)
 		r.Get("/api/v1/availability/stream", s.streamAvailability)
@@ -508,7 +518,7 @@ func (s *Server) adminState(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, 200, map[string]any{"counts": counts, "integrations": s.Integrations.Statuses(), "config": map[string]any{"movieLibraryRoot": s.Config.MovieLibraryRoot, "showLibraryRoot": s.Config.ShowLibraryRoot, "imageCacheDir": s.Config.ImageCacheDir, "plarrHost": s.Config.PlarrHost, "tmdbConfigured": s.Config.TMDBBearerToken != "", "movieCategory": s.Config.QBittorrentMovieCategory, "showCategory": s.Config.QBittorrentShowCategory}})
 }
 
-var catalogPath = regexp.MustCompile(`^(search/(movie|tv)|discover/(movie|tv)|genre/(movie|tv)/list|configuration/countries|certification/movie/list|(movie|tv)/\d+/(recommendations|keywords)|collection/\d+(/recommendations)?|(movie|tv)/\d+|tv/\d+/season/\d+(/episode/\d+)?)$`)
+var catalogPath = regexp.MustCompile(`^(search/(movie|tv)|discover/(movie|tv)|genre/(movie|tv)/list|configuration/countries|certification/movie/list|(movie|tv)/\d+/(recommendations|keywords|credits)|collection/\d+(/recommendations)?|(movie|tv)/\d+|tv/\d+/season/\d+(/episode/\d+)?)$`)
 
 func (s *Server) keywordSearch(w http.ResponseWriter, r *http.Request) {
 	if s.Keywords == nil || !s.Keywords.Ready() {
@@ -611,6 +621,9 @@ func (s *Server) catalog(w http.ResponseWriter, r *http.Request) {
 	cacheableDetail := cacheableCatalogDetail(detail, q)
 	if cacheableDetail && !refresh {
 		if b, e := s.Store.GetMetadata(r.Context(), c.UserID, kind, id, u.Language); e == nil {
+			if kind == "movie" {
+				s.storeMovieCompanies(r, id, b)
+			}
 			w.Header().Set("X-Nestrr-Metadata", "stored")
 			jsonBytes(w, 200, "application/json", s.enrichCatalogRatings(r.Context(), path, b, false))
 			return
@@ -626,6 +639,14 @@ func (s *Server) catalog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body := res.Body
+	if cacheableDetail && kind == "movie" {
+		s.storeMovieCompanies(r, id, res.Body)
+	}
+	if len(parts) == 3 && (parts[0] == "movie" || parts[0] == "tv") && parts[2] == "credits" {
+		if err := s.storeMediaCredits(r.Context(), parts[0], id, res.Body); err != nil {
+			s.Log.Warn("TMDB credits could not be indexed", "operation", "credits.index", "mediaType", parts[0], "tmdbId", id, "error", err)
+		}
+	}
 	if cacheableDetail {
 		if s.Store.PutMetadata(r.Context(), c.UserID, kind, id, u.Language, res.Body) == nil {
 			if persisted, persistedErr := s.Store.GetMetadata(r.Context(), c.UserID, kind, id, u.Language); persistedErr == nil {

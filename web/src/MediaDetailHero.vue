@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import type { RouteLocationRaw } from "vue-router";
 import AppIcon from "./AppIcon.vue";
 import MediaKeywordsMenu from "./MediaKeywordsMenu.vue";
 import MediaMetadataGroup from "./MediaMetadataGroup.vue";
+import MovieCredits from "./MovieCredits.vue";
 import TorrentDownloadProgress from "./TorrentDownloadProgress.vue";
+import type { MovieCredits as MovieCreditsData } from "./mediaCredits";
+import type { MovieCreditPerson } from "./mediaCredits";
+import { exploreQuery } from "./discoverState";
+import { createMovieFilters } from "./movieFilters";
 import {
   companyMetadataItems,
   countryMetadataItems,
@@ -28,6 +34,7 @@ type MediaDetail = {
   production_countries?: TMDBCountry[];
   _availabilityState?: string;
   _keywords?: TMDBNamedItem[];
+  _credits?: MovieCreditsData;
   [key: string]: unknown;
 };
 
@@ -82,6 +89,14 @@ const rottenTomatoesScore = computed(() => {
     ? Math.round(score)
     : null;
 });
+function personExploreRoute(
+  person: MovieCreditPerson,
+  role: "cast" | "directors",
+): RouteLocationRaw {
+  const filters = createMovieFilters();
+  filters[role] = [{ id: person.id, name: person.name }];
+  return { path: "/", query: exploreQuery("movie", "", filters) };
+}
 </script>
 
 <template>
@@ -91,18 +106,18 @@ const rottenTomatoesScore = computed(() => {
       backgroundImage: `linear-gradient(90deg,#060a12 2%,rgba(6,10,18,.86) 52%,rgba(6,10,18,.2)),linear-gradient(0deg,#060a12 0%,transparent 35%),url(${artwork(detail.backdrop_path, 'original')})`,
     }"
   >
+    <p class="eyebrow">
+      {{
+        currentKind === "movie"
+          ? t("movie")
+          : currentKind === "tv"
+            ? t("show")
+            : t("collection")
+      }}
+      · {{ year(detail) }}
+    </p>
     <img class="detail-poster" :src="artwork(detail.poster_path)" alt="" />
     <div class="detail-copy">
-      <p class="eyebrow">
-        {{
-          currentKind === "movie"
-            ? t("movie")
-            : currentKind === "tv"
-              ? t("show")
-              : t("collection")
-        }}
-        · {{ year(detail) }}
-      </p>
       <h1>{{ title(detail) }}</h1>
       <div class="facts">
         <span
@@ -209,6 +224,16 @@ const rottenTomatoesScore = computed(() => {
           <AppIcon name="refresh" />
         </button>
       </div>
+      <MovieCredits
+        v-if="currentKind === 'movie' && detail._credits"
+        :directors="detail._credits.directors"
+        :cast="detail._credits.cast"
+        :director-label="t('director')"
+        :cast-label="t('cast')"
+        :artwork="artwork"
+        :director-to="(person) => personExploreRoute(person, 'directors')"
+        :cast-to="(person) => personExploreRoute(person, 'cast')"
+      />
       <div
         v-if="currentKind === 'movie' || currentKind === 'tv'"
         class="title-list-actions"

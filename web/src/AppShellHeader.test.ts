@@ -62,4 +62,33 @@ describe("AppShellHeader", () => {
     await view.rerender({ ...props, path: "/settings" });
     expect(view.queryByRole("menu")).toBeNull();
   });
+
+  it("keeps the menu mounted while focus moves between its actions", async () => {
+    const view = render(AppShellHeader, {
+      props: {
+        user: {
+          id: 1,
+          username: "admin",
+          isAdmin: true,
+          language: "en",
+          accentColor: "#000000",
+        },
+        impersonating: false,
+        path: "/recommendations",
+        translate: (key: string) => key,
+      },
+      global: {
+        stubs: { RouterLink: { template: "<a><slot /></a>" } },
+      },
+    });
+
+    await fireEvent.click(view.getByRole("button", { name: "A" }));
+    const settings = view.getByRole("menuitem", { name: "settings" });
+    const admin = view.getByRole("menuitem", { name: "admin" });
+
+    await fireEvent.focusOut(settings, { relatedTarget: admin });
+
+    expect(view.getByRole("menu")).toBeTruthy();
+    expect(view.getByRole("menuitem", { name: "admin" })).toBeTruthy();
+  });
 });
