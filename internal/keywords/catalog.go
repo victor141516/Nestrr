@@ -10,12 +10,11 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 	"time"
+
+	"github.com/victor141516/Nestrr/internal/store"
 )
 
 const (
@@ -27,45 +26,33 @@ const (
 type Entry struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
-
-	normalized string
 }
 
+// Catalog imports TMDB's weekly export directly into SQLite. The export is
+// transient input only; the database is the sole persistent keyword source.
 type Catalog struct {
-	path       string
+	store      *store.Store
 	exportBase string
 	http       *http.Client
 	log        *slog.Logger
 	now        func() time.Time
-
-	mu        sync.RWMutex
-	entries   []Entry
-	byID      map[int]Entry
-	updatedAt time.Time
 }
 
-func New(path string, client *http.Client, log *slog.Logger) *Catalog {
+func New(database *store.Store, client *http.Client, log *slog.Logger) *Catalog {
 	if client == nil {
 		client = http.DefaultClient
 	}
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Catalog{
-		path:       path,
-		exportBase: defaultExportBase,
-		http:       client,
-		log:        log,
-		now:        time.Now,
-		byID:       make(map[int]Entry),
-	}
+	return &Catalog{store: database, exportBase: defaultExportBase, http: client, log: log, now: time.Now}
 }
 
-// Start loads the last valid export before serving requests, refreshes it when
-// it is older than one week, and checks daily so transient failures retry soon.
 func (c *Catalog) Start(ctx context.Context) {
-	loaded := c.loadFile() == nil
-	if !loaded || c.stale() {
+	if c.store == nil {
+		return
+	}
+	if ready, updatedAt := c.state(ctx); !ready || c.now().Sub(updatedAt) >= refreshInterval {
 		if err := c.refresh(ctx); err != nil {
 			c.log.Warn("TMDB keyword export refresh failed", "operation", "keywords.refresh", "error", err)
 		}
@@ -78,7 +65,7 @@ func (c *Catalog) Start(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if c.stale() {
+				if ready, updatedAt := c.state(ctx); !ready || c.now().Sub(updatedAt) >= refreshInterval {
 					if err := c.refresh(ctx); err != nil {
 						c.log.Warn("TMDB keyword export refresh failed", "operation", "keywords.refresh", "error", err)
 					}
@@ -88,107 +75,51 @@ func (c *Catalog) Start(ctx context.Context) {
 	}()
 }
 
-func (c *Catalog) Ready() bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return len(c.entries) > 0
+func (c *Catalog) state(ctx context.Context) (bool, time.Time) {
+	count, updatedAt, err := c.store.KeywordCatalogState(ctx)
+	return err == nil && count > 0, updatedAt
 }
 
-func (c *Catalog) UpdatedAt() time.Time {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.updatedAt
+func (c *Catalog) Ready(ctx context.Context) bool {
+	ready, _ := c.state(ctx)
+	return ready
 }
 
-func (c *Catalog) Prefix(query string, limit int) []Entry {
-	query = normalize(query)
-	if query == "" || limit <= 0 {
-		return nil
-	}
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	start := sort.Search(len(c.entries), func(index int) bool {
-		return c.entries[index].normalized >= query
-	})
-	results := make([]Entry, 0, limit)
-	for index := start; index < len(c.entries) && len(results) < limit; index++ {
-		entry := c.entries[index]
-		if !strings.HasPrefix(entry.normalized, query) {
-			break
-		}
-		results = append(results, publicEntry(entry))
-	}
-	return results
+func (c *Catalog) UpdatedAt(ctx context.Context) time.Time {
+	_, updatedAt := c.state(ctx)
+	return updatedAt
 }
 
-func (c *Catalog) Contains(query string, limit int) []Entry {
-	query = normalize(query)
-	if query == "" || limit <= 0 {
-		return nil
-	}
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	results := make([]Entry, 0, limit)
-	for _, entry := range c.entries {
-		if strings.HasPrefix(entry.normalized, query) || !strings.Contains(entry.normalized, query) {
-			continue
-		}
-		results = append(results, publicEntry(entry))
-		if len(results) == limit {
-			break
-		}
-	}
-	return results
+func (c *Catalog) Prefix(ctx context.Context, query string, limit int) ([]Entry, error) {
+	return c.search(ctx, query, "prefix", limit)
 }
 
-func (c *Catalog) ByIDs(ids []int) []Entry {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	results := make([]Entry, 0, len(ids))
-	seen := make(map[int]struct{}, len(ids))
-	for _, id := range ids {
-		if _, duplicate := seen[id]; duplicate {
-			continue
-		}
-		seen[id] = struct{}{}
-		if entry, ok := c.byID[id]; ok {
-			results = append(results, publicEntry(entry))
-		}
-	}
-	return results
+func (c *Catalog) Contains(ctx context.Context, query string, limit int) ([]Entry, error) {
+	return c.search(ctx, query, "contains", limit)
 }
 
-func publicEntry(entry Entry) Entry {
-	entry.normalized = ""
-	return entry
-}
-
-func normalize(value string) string {
-	return strings.ToLower(strings.TrimSpace(value))
-}
-
-func (c *Catalog) stale() bool {
-	c.mu.RLock()
-	updatedAt := c.updatedAt
-	c.mu.RUnlock()
-	return updatedAt.IsZero() || c.now().Sub(updatedAt) >= refreshInterval
-}
-
-func (c *Catalog) loadFile() error {
-	data, err := os.ReadFile(c.path)
+func (c *Catalog) search(ctx context.Context, query, phase string, limit int) ([]Entry, error) {
+	values, err := c.store.SearchKeywords(ctx, query, phase, limit)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	entries, err := decodeExport(data)
+	results := make([]Entry, len(values))
+	for index, value := range values {
+		results[index] = Entry{ID: value.ID, Name: value.Name}
+	}
+	return results, nil
+}
+
+func (c *Catalog) ByIDs(ctx context.Context, ids []int) ([]Entry, error) {
+	values, err := c.store.KeywordsByIDs(ctx, ids)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	info, err := os.Stat(c.path)
-	if err != nil {
-		return err
+	results := make([]Entry, len(values))
+	for index, value := range values {
+		results[index] = Entry{ID: value.ID, Name: value.Name}
 	}
-	c.replace(entries, info.ModTime())
-	return nil
+	return results, nil
 }
 
 func (c *Catalog) refresh(ctx context.Context) error {
@@ -200,43 +131,16 @@ func (c *Catalog) refresh(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(c.path), 0o750); err != nil {
-		return err
-	}
-	temporary, err := os.CreateTemp(filepath.Dir(c.path), "tmdb-keywords-*.json.gz")
-	if err != nil {
-		return err
-	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	if _, err = temporary.Write(data); err == nil {
-		err = temporary.Sync()
-	}
-	if closeErr := temporary.Close(); err == nil {
-		err = closeErr
-	}
-	if err != nil {
-		return err
-	}
-	if err = os.Rename(temporaryPath, c.path); err != nil {
-		return err
+	values := make([]store.Keyword, len(entries))
+	for index, entry := range entries {
+		values[index] = store.Keyword{ID: entry.ID, Name: entry.Name}
 	}
 	now := c.now()
-	c.replace(entries, now)
-	c.log.Info("TMDB keyword export loaded", "operation", "keywords.refresh", "entries", len(entries))
-	return nil
-}
-
-func (c *Catalog) replace(entries []Entry, updatedAt time.Time) {
-	byID := make(map[int]Entry, len(entries))
-	for _, entry := range entries {
-		byID[entry.ID] = entry
+	if err := c.store.ReplaceKeywordCatalog(ctx, values, now); err != nil {
+		return err
 	}
-	c.mu.Lock()
-	c.entries = entries
-	c.byID = byID
-	c.updatedAt = updatedAt
-	c.mu.Unlock()
+	c.log.Info("TMDB keyword export imported", "operation", "keywords.refresh", "entries", len(entries))
+	return nil
 }
 
 func (c *Catalog) downloadLatest(ctx context.Context) ([]byte, error) {
@@ -296,8 +200,7 @@ func decodeExport(data []byte) ([]Entry, error) {
 			return nil, fmt.Errorf("decode keyword export: %w", err)
 		}
 		entry.Name = strings.TrimSpace(entry.Name)
-		entry.normalized = normalize(entry.Name)
-		if entry.ID <= 0 || entry.normalized == "" {
+		if entry.ID <= 0 || entry.Name == "" {
 			continue
 		}
 		if _, duplicate := seen[entry.ID]; duplicate {
@@ -310,10 +213,11 @@ func decodeExport(data []byte) ([]Entry, error) {
 		return nil, fmt.Errorf("keyword export contains only %d valid entries", len(entries))
 	}
 	sort.Slice(entries, func(left, right int) bool {
-		if entries[left].normalized == entries[right].normalized {
+		leftName, rightName := strings.ToLower(entries[left].Name), strings.ToLower(entries[right].Name)
+		if leftName == rightName {
 			return entries[left].ID < entries[right].ID
 		}
-		return entries[left].normalized < entries[right].normalized
+		return leftName < rightName
 	})
 	return entries, nil
 }

@@ -38,6 +38,12 @@ export function routeLoadQuery(path: string, query: RouteQuery): RouteQuery {
     delete next.season;
     delete next.episode;
   }
+  if (path === "/recommendations") delete next.type;
+  if (/^\/lists\/\d+$/.test(path)) {
+    delete next.type;
+    delete next.sort;
+    delete next.direction;
+  }
   return next;
 }
 

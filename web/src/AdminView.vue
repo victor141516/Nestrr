@@ -12,6 +12,7 @@ const {
   integrationCount,
   integrationLabel,
   integrations,
+  confirmMetadata,
   openAdminAction,
   recommendationRun,
   runRecommendationCatalog,
@@ -119,6 +120,9 @@ const {
           {{ adminState.counts.progress }} progress
         </p>
       </div>
+      <button class="danger-outline" @click="confirmMetadata = true">
+        <AppIcon name="trash" />{{ t("clear") }}
+      </button>
     </section>
   </section>
 </template>

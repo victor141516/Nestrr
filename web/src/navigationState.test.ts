@@ -32,4 +32,24 @@ describe("playback navigation state", () => {
       }),
     ).toEqual({ source: "library" });
   });
+
+  it("lets recommendations react to media type without reloading the route shell", () => {
+    expect(
+      routeLoadQuery("/recommendations", {
+        type: "Shows",
+        source: "navigation",
+      }),
+    ).toEqual({ source: "navigation" });
+  });
+
+  it("lets list controls react without reloading the route shell", () => {
+    expect(
+      routeLoadQuery("/lists/4", {
+        type: "Shows",
+        sort: "rating",
+        direction: "asc",
+        source: "navigation",
+      }),
+    ).toEqual({ source: "navigation" });
+  });
 });

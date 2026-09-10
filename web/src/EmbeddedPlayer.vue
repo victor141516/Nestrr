@@ -40,6 +40,7 @@ onBeforeUnmount(() => window.removeEventListener("message", onMessage));
 <template>
   <div class="player-overlay">
     <iframe
+      :key="url"
       ref="frame"
       class="player-frame"
       :src="url"

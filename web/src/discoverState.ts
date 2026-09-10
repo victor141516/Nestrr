@@ -4,8 +4,13 @@ import {
   type MovieFilters,
 } from "./movieFilters";
 import type { ExploreSort } from "./downloadedExplore";
+import {
+  mediaTypeFromQuery,
+  mediaTypeQueryValue,
+  type CatalogMediaType,
+} from "./mediaType";
 
-export type ExploreKind = "movie" | "tv";
+export type ExploreKind = CatalogMediaType;
 export type ExploreURLState = {
   kind: ExploreKind;
   query: string;
@@ -13,14 +18,6 @@ export type ExploreURLState = {
   downloaded: boolean;
   sort: ExploreSort;
 };
-
-function exploreKind(value: unknown): ExploreKind {
-  if (typeof value !== "string") return "movie";
-  const normalized = value.trim().toLowerCase();
-  return normalized === "shows" || normalized === "show" || normalized === "tv"
-    ? "tv"
-    : "movie";
-}
 
 function exploreSort(value: unknown): ExploreSort {
   return value === "release" || value === "rating" || value === "title"
@@ -69,7 +66,7 @@ export function parseExploreQuery(
   query: Record<string, unknown>,
   language = "en-US",
 ): ExploreURLState {
-  const kind = exploreKind(query.type);
+  const kind = mediaTypeFromQuery(query.type);
   const filters = normalizeMovieFilters({
     ...createMovieFilters(language),
     yearMin: numberOrNull(query.yearMin),
@@ -121,7 +118,7 @@ export function exploreQuery(
   sort: ExploreSort = "popularity",
 ) {
   const result: Record<string, string> = {
-    type: kind === "tv" ? "Shows" : "Movies",
+    type: mediaTypeQueryValue(kind),
   };
   if (query.trim()) result.q = query.trim();
   if (downloaded) result.downloaded = "1";

@@ -13,3 +13,9 @@
 - Use `append_to_response` on those detail endpoints when Nestrr also needs related resources such as credits, keywords, release dates, or content ratings.
 - Never write a movie or show listing result directly into the canonical catalog. Results from discover, search, popular, trending, recommendations, lists, or any other listing endpoint are partial candidate records only.
 - Partial listing results may be stored only in a separate staging or work queue. Hydrate each candidate through its complete detail endpoint before inserting or updating the canonical `movies` or `shows` data.
+
+# Environment policy
+
+- Treat the environment running the agent as a development environment. Agents may stop, restart, rebuild, or temporarily disrupt its services whenever needed for implementation or verification, without requesting additional permission.
+- Preserve recoverable data and do not intentionally corrupt or destroy the database. Use backups or other appropriate safeguards before risky schema or storage work.
+- Treat any separate remote server as production unless the user explicitly says otherwise. Do not assume that the development-environment permissions above apply to it.

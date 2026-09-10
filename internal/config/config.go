@@ -15,7 +15,6 @@ type Config struct {
 	ListenAddr               string
 	DatabasePath             string
 	ImageCacheDir            string
-	KeywordCachePath         string
 	MovieLibraryRoot         string
 	ShowLibraryRoot          string
 	TMDBBearerToken          string
@@ -78,7 +77,6 @@ func Load() (Config, error) {
 		LogLevel:                 level("NESTRR_LOG_LEVEL", slog.LevelInfo),
 		FrontendDir:              env("NESTRR_FRONTEND_DIR", filepath.Join(cwd, "web", "dist")),
 	}
-	c.KeywordCachePath = env("NESTRR_KEYWORD_CACHE_PATH", filepath.Join(filepath.Dir(c.DatabasePath), "tmdb-keywords.json.gz"))
 	if c.JWTSecret == "" {
 		return c, errors.New("NESTRR_JWT_SECRET is required")
 	}
@@ -96,7 +94,7 @@ func Load() (Config, error) {
 	if err := os.MkdirAll(filepath.Dir(c.DatabasePath), 0o750); err != nil {
 		return c, err
 	}
-	for _, dir := range []string{c.ImageCacheDir, filepath.Dir(c.KeywordCachePath), c.MovieLibraryRoot, c.ShowLibraryRoot} {
+	for _, dir := range []string{c.ImageCacheDir, c.MovieLibraryRoot, c.ShowLibraryRoot} {
 		if err := os.MkdirAll(dir, 0o750); err != nil {
 			return c, err
 		}

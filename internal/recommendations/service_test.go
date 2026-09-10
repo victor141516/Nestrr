@@ -99,11 +99,14 @@ func TestRunHydratesCandidatesAndRecommendationsStayLocal(t *testing.T) {
 		t.Fatalf("listing payload leaked into canonical catalog: %#v %v", media, err)
 	}
 	beforeRecommendations := requestCount
+	if err := database.PutMetadata(ctx, "movie", 2, "es_es", []byte(`{"id":2,"title":"Candidata compartida","overview":"Metadatos compartidos"}`)); err != nil {
+		t.Fatal(err)
+	}
 	recommendations, err := service.Recommend(ctx, user.ID, "es-ES", "movie", 10)
 	if err != nil || len(recommendations) != 1 || recommendations[0].ID != 2 {
 		t.Fatalf("unexpected recommendations: %#v %v", recommendations, err)
 	}
-	if recommendations[0].Title != "Candidate ES" || recommendations[0].Overview != "Descripción" {
+	if recommendations[0].Title != "Candidata compartida" || recommendations[0].Overview != "Metadatos compartidos" {
 		t.Fatalf("recommendation was not localized from its complete document: %#v", recommendations[0])
 	}
 	if requestCount != beforeRecommendations {

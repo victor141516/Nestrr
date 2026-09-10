@@ -61,7 +61,7 @@ func TestBulkImportStreamsDatabaseTMDBAndMissingResults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := database.PutMetadata(ctx, user.ID, "movie", 550, "es-ES", []byte(`{"id":550,"title":"El club de la lucha","original_title":"Fight Club","poster_path":"/fight.jpg"}`)); err != nil {
+	if err := database.PutMetadata(ctx, "movie", 550, "es-ES", []byte(`{"id":550,"title":"El club de la lucha","original_title":"Fight Club","poster_path":"/fight.jpg"}`)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -158,10 +158,10 @@ func TestBulkImportStreamsDatabaseTMDBAndMissingResults(t *testing.T) {
 	if err != nil || len(items) != 2 {
 		t.Fatalf("saved items = %#v, err=%v", items, err)
 	}
-	if _, err := database.GetMetadata(ctx, user.ID, "movie", 900, "en-US"); err != nil {
+	if _, err := database.GetMetadata(ctx, "movie", 900, "en-US"); err != nil {
 		t.Fatalf("English TMDB metadata was not cached: %v", err)
 	}
-	if _, err := database.GetMetadata(ctx, user.ID, "movie", 900, "es-ES"); err != nil {
+	if _, err := database.GetMetadata(ctx, "movie", 900, "es-ES"); err != nil {
 		t.Fatalf("localized TMDB metadata was not cached: %v", err)
 	}
 

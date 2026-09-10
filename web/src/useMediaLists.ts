@@ -1,7 +1,9 @@
 import {
+  computed,
   onBeforeUnmount,
   reactive,
   ref,
+  watch,
   type ComputedRef,
   type Ref,
 } from "vue";
@@ -16,6 +18,16 @@ import {
   type MediaList,
   type MediaListItem,
 } from "./mediaLists";
+import {
+  isCanonicalListViewQuery,
+  listViewQuery,
+  parseListViewQuery,
+  type ListDirection,
+  type ListRouteQuery,
+  type ListSort,
+  type ListViewState,
+} from "./listViewState";
+import type { CatalogMediaType } from "./mediaType";
 
 type PendingListRemoval = {
   listId: number;
@@ -27,6 +39,7 @@ type PendingListRemoval = {
 
 type Options = {
   router: Router;
+  currentRoute: { readonly query: ListRouteQuery };
   pathOnly: ComputedRef<string>;
   progress: Ref<any[]>;
   detail: Ref<any>;
@@ -36,15 +49,24 @@ type Options = {
 };
 
 export function useMediaLists(options: Options) {
-  const { router, pathOnly, progress, detail, loadSeasonEpisodes, t, flash } =
-    options;
+  const {
+    router,
+    currentRoute,
+    pathOnly,
+    progress,
+    detail,
+    loadSeasonEpisodes,
+    t,
+    flash,
+  } = options;
   const mediaLists = ref<MediaList[]>([]);
   const listMemberships = ref<ListMembership[]>([]);
   const activeList = ref<MediaList | null>(null);
   const activeListItems = ref<MediaListItem[]>([]);
-  const listMediaType = ref<"all" | "movie" | "tv">("all");
-  const listSort = ref("addedAt");
-  const listDirection = ref<"asc" | "desc">("desc");
+  const listViewState = computed(() => parseListViewQuery(currentRoute.query));
+  const listMediaType = computed(() => listViewState.value.mediaType);
+  const listSort = computed(() => listViewState.value.sort);
+  const listDirection = computed(() => listViewState.value.direction);
   const listEditor = ref<{
     mode: "create" | "rename" | "delete";
     list?: MediaList;
@@ -158,7 +180,7 @@ export function useMediaLists(options: Options) {
     );
     if (
       activeList.value?.id === listId &&
-      (listMediaType.value === "all" || listMediaType.value === item.mediaType)
+      listMediaType.value === item.mediaType
     ) {
       const next = [...activeListItems.value];
       if (existingIndex >= 0) next[existingIndex] = item;
@@ -237,23 +259,75 @@ export function useMediaLists(options: Options) {
     listMemberships.value = membershipsDoc.items || [];
     progress.value = progressDoc.items || [];
   }
+  let listLoadRevision = 0;
   async function loadListsPage(path = pathOnly.value) {
-    clearPendingListRemovals();
-    activeList.value = null;
-    activeListItems.value = [];
+    const revision = ++listLoadRevision;
     const match = path.match(/^\/lists\/(\d+)$/);
-    if (!match) return;
+    if (!match) {
+      clearPendingListRemovals();
+      activeList.value = null;
+      activeListItems.value = [];
+      return;
+    }
+    const viewState = listViewState.value;
+    if (!isCanonicalListViewQuery(currentRoute.query, viewState)) {
+      await router.replace({
+        path,
+        query: listViewQuery(currentRoute.query, viewState),
+      });
+      return;
+    }
     const id = Number(match[1]);
+    const isSameList = activeList.value?.id === id;
+    clearPendingListRemovals();
+    if (!isSameList) {
+      activeList.value = null;
+      activeListItems.value = [];
+    }
     const params = new URLSearchParams({
       sort: listSort.value,
       direction: listDirection.value,
     });
-    if (listMediaType.value !== "all")
-      params.set("mediaType", listMediaType.value);
+    params.set("mediaType", listMediaType.value);
     const result = await api<any>(`/lists/${id}/items?${params}`);
+    if (revision !== listLoadRevision) return;
     activeList.value = result.list;
     activeListItems.value = result.items || [];
   }
+
+  function updateListViewState(patch: Partial<ListViewState>): void {
+    const next = { ...listViewState.value, ...patch };
+    void router.push({
+      path: pathOnly.value,
+      query: listViewQuery(currentRoute.query, next),
+    });
+  }
+
+  function setListMediaType(mediaType: CatalogMediaType): void {
+    updateListViewState({ mediaType });
+  }
+
+  function setListSort(sort: ListSort): void {
+    updateListViewState({ sort });
+  }
+
+  function toggleListDirection(): void {
+    updateListViewState({
+      direction: listDirection.value === "desc" ? "asc" : "desc",
+    });
+  }
+
+  const listQueryKey = computed(() =>
+    JSON.stringify([
+      currentRoute.query.type,
+      currentRoute.query.sort,
+      currentRoute.query.direction,
+    ]),
+  );
+  watch([pathOnly, listQueryKey], ([path], [previousPath]) => {
+    if (path === previousPath && /^\/lists\/\d+$/.test(path))
+      void loadListsPage(path);
+  });
 
   async function setEpisodeWatched(episode: any, watched: boolean) {
     const p = await api<any>(`/progress/episode/${episode.id}/watched`, {
@@ -409,11 +483,14 @@ export function useMediaLists(options: Options) {
     pendingRemovalFor,
     saveListEditor,
     setEpisodeWatched,
+    setListMediaType,
+    setListSort,
     setSeasonWatched,
     startedFor,
     systemListName,
     systemMembershipsFor,
     toggleCustomList,
+    toggleListDirection,
     toggleRowList,
     toggleSystemList,
   };

@@ -33,6 +33,19 @@ function mountPlayer() {
 }
 
 describe("EmbeddedPlayer", () => {
+  it("replaces the iframe when the media URL changes", async () => {
+    const view = mountPlayer();
+    const firstFrame = view.container.querySelector("iframe")!;
+
+    await view.rerender({ url: "https://player.example/play-next" });
+
+    const nextFrame = view.container.querySelector("iframe")!;
+    expect(nextFrame).not.toBe(firstFrame);
+    expect(nextFrame.getAttribute("src")).toBe(
+      "https://player.example/play-next",
+    );
+  });
+
   it("only emits validated messages from its own frame and origin", () => {
     const view = mountPlayer();
     const frame = view.container.querySelector("iframe")!;

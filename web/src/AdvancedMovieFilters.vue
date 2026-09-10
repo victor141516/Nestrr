@@ -3,7 +3,8 @@ import { computed, reactive, watch } from "vue";
 import AppIcon from "./AppIcon.vue";
 import CountryMultiSelect from "./CountryMultiSelect.vue";
 import CompanyTagInput from "./CompanyTagInput.vue";
-import DualRangeSlider from "./DualRangeSlider.vue";
+import FilterRangeField from "./FilterRangeField.vue";
+import GenreFilterField from "./GenreFilterField.vue";
 import KeywordTagInput from "./KeywordTagInput.vue";
 import PersonTagInput from "./PersonTagInput.vue";
 import { session } from "./api";
@@ -11,8 +12,6 @@ import { tr } from "./i18n";
 import {
   cloneMovieFilters,
   createMovieFilters,
-  cycleGenre,
-  genreState,
   normalizeMovieFilters,
   productionCountryOptions,
   type CountryOption,
@@ -40,15 +39,9 @@ watch(
   (value) => Object.assign(draft, cloneMovieFilters(value)),
   { deep: true },
 );
-const sortedGenres = computed(() =>
-  [...props.genres].sort((a, b) => a.name.localeCompare(b.name)),
-);
 const countryOptions = computed(() =>
   productionCountryOptions(props.countries),
 );
-function toggleGenre(id: number) {
-  Object.assign(draft, cycleGenre(draft, id));
-}
 function setIncludedKeywords(value: MovieFilters["includeKeywords"]) {
   draft.includeKeywords = value;
   const selected = new Set(value.map((keyword) => keyword.id));
@@ -71,14 +64,6 @@ function setDirectors(value: MovieFilters["directors"]) {
 }
 function setCompanies(value: MovieFilters["includeCompanies"]) {
   draft.includeCompanies = value;
-}
-function genreLabel(genre: FilterOption) {
-  const state = genreState(draft, genre.id);
-  return state === "include"
-    ? `${t("included")}: ${genre.name}`
-    : state === "exclude"
-      ? `${t("excluded")}: ${genre.name}`
-      : `${t("neutral")}: ${genre.name}`;
 }
 function reset() {
   const fresh = createMovieFilters(session.user?.language);
@@ -105,87 +90,76 @@ function apply() {
           { 'has-rotten-tomatoes': rottenTomatoesEnabled },
         ]"
       >
-        <fieldset class="filter-card range-card">
-          <legend>
-            <AppIcon name="timer" /><b>{{ t("releaseYear") }}</b>
-          </legend>
-          <DualRangeSlider
-            :min-value="draft.yearMin"
-            :max-value="draft.yearMax"
-            :floor="1870"
-            :ceiling="currentYear + 5"
-            :min-label="`${t('releaseYear')} · ${t('minimum')}`"
-            :max-label="`${t('releaseYear')} · ${t('maximum')}`"
-            @update:min-value="draft.yearMin = $event"
-            @update:max-value="draft.yearMax = $event"
-          />
-        </fieldset>
-        <fieldset class="filter-card range-card">
-          <legend><AppIcon name="star" /><b>TMDB</b></legend>
-          <DualRangeSlider
-            :min-value="draft.ratingMin"
-            :max-value="draft.ratingMax"
-            :floor="0"
-            :ceiling="10"
-            :step="0.5"
-            :min-label="`${t('rating')} · ${t('minimum')}`"
-            :max-label="`${t('rating')} · ${t('maximum')}`"
-            @update:min-value="draft.ratingMin = $event"
-            @update:max-value="draft.ratingMax = $event"
-          />
-        </fieldset>
-        <fieldset v-if="rottenTomatoesEnabled" class="filter-card range-card">
-          <legend>
-            <AppIcon name="tomato" /><b>{{ t("rottenTomatoes") }}</b>
-          </legend>
-          <DualRangeSlider
-            :min-value="draft.rottenTomatoesMin"
-            :max-value="draft.rottenTomatoesMax"
-            :floor="0"
-            :ceiling="100"
-            :min-label="`${t('rottenTomatoes')} · ${t('minimum')}`"
-            :max-label="`${t('rottenTomatoes')} · ${t('maximum')}`"
-            :format-value="(value) => `${value}%`"
-            @update:min-value="draft.rottenTomatoesMin = $event"
-            @update:max-value="draft.rottenTomatoesMax = $event"
-          />
-        </fieldset>
-        <fieldset v-if="mediaType === 'movie'" class="filter-card range-card">
-          <legend>
-            <AppIcon name="clock" /><b>{{ t("runtime") }}</b>
-          </legend>
-          <DualRangeSlider
-            :min-value="draft.runtimeMin"
-            :max-value="draft.runtimeMax"
-            :floor="0"
-            :ceiling="600"
-            :step="5"
-            :min-label="`${t('runtime')} · ${t('minimum')}`"
-            :max-label="`${t('runtime')} · ${t('maximum')}`"
-            :format-value="(value) => `${value} min`"
-            @update:min-value="draft.runtimeMin = $event"
-            @update:max-value="draft.runtimeMax = $event"
-          />
-        </fieldset>
-        <fieldset class="filter-card range-card">
-          <legend>
-            <AppIcon name="shield" /><b>{{ t("ageRating") }}</b>
-          </legend>
-          <DualRangeSlider
-            :min-value="draft.ageMin"
-            :max-value="draft.ageMax"
-            :floor="0"
-            :ceiling="18"
-            :min-label="`${t('ageRating')} · ${t('minimum')}`"
-            :max-label="`${t('ageRating')} · ${t('maximum')}`"
-            :format-value="
-              (value) =>
-                `${value} ${session.user?.language?.startsWith('es') ? 'años' : 'years'}`
-            "
-            @update:min-value="draft.ageMin = $event"
-            @update:max-value="draft.ageMax = $event"
-          />
-        </fieldset>
+        <FilterRangeField
+          icon="timer"
+          :title="t('releaseYear')"
+          :min-value="draft.yearMin"
+          :max-value="draft.yearMax"
+          :floor="1870"
+          :ceiling="currentYear + 5"
+          :min-label="`${t('releaseYear')} · ${t('minimum')}`"
+          :max-label="`${t('releaseYear')} · ${t('maximum')}`"
+          @update:min-value="draft.yearMin = $event"
+          @update:max-value="draft.yearMax = $event"
+        />
+        <FilterRangeField
+          icon="star"
+          title="TMDB"
+          :min-value="draft.ratingMin"
+          :max-value="draft.ratingMax"
+          :floor="0"
+          :ceiling="10"
+          :step="0.5"
+          :min-label="`${t('rating')} · ${t('minimum')}`"
+          :max-label="`${t('rating')} · ${t('maximum')}`"
+          @update:min-value="draft.ratingMin = $event"
+          @update:max-value="draft.ratingMax = $event"
+        />
+        <FilterRangeField
+          v-if="rottenTomatoesEnabled"
+          icon="tomato"
+          :title="t('rottenTomatoes')"
+          :min-value="draft.rottenTomatoesMin"
+          :max-value="draft.rottenTomatoesMax"
+          :floor="0"
+          :ceiling="100"
+          :min-label="`${t('rottenTomatoes')} · ${t('minimum')}`"
+          :max-label="`${t('rottenTomatoes')} · ${t('maximum')}`"
+          :format-value="(value) => `${value}%`"
+          @update:min-value="draft.rottenTomatoesMin = $event"
+          @update:max-value="draft.rottenTomatoesMax = $event"
+        />
+        <FilterRangeField
+          v-if="mediaType === 'movie'"
+          icon="clock"
+          :title="t('runtime')"
+          :min-value="draft.runtimeMin"
+          :max-value="draft.runtimeMax"
+          :floor="0"
+          :ceiling="600"
+          :step="5"
+          :min-label="`${t('runtime')} · ${t('minimum')}`"
+          :max-label="`${t('runtime')} · ${t('maximum')}`"
+          :format-value="(value) => `${value} min`"
+          @update:min-value="draft.runtimeMin = $event"
+          @update:max-value="draft.runtimeMax = $event"
+        />
+        <FilterRangeField
+          icon="shield"
+          :title="t('ageRating')"
+          :min-value="draft.ageMin"
+          :max-value="draft.ageMax"
+          :floor="0"
+          :ceiling="18"
+          :min-label="`${t('ageRating')} · ${t('minimum')}`"
+          :max-label="`${t('ageRating')} · ${t('maximum')}`"
+          :format-value="
+            (value) =>
+              `${value} ${session.user?.language?.startsWith('es') ? 'años' : 'years'}`
+          "
+          @update:min-value="draft.ageMin = $event"
+          @update:max-value="draft.ageMax = $event"
+        />
         <fieldset class="filter-card country-card compact-country-card">
           <legend>
             <AppIcon name="globe" /><b>{{ t("productionCountry") }}</b>
@@ -196,37 +170,12 @@ function apply() {
             :countries="countries"
           />
         </fieldset>
-        <fieldset class="filter-card genre-card compact-genre-card">
-          <legend>
-            <AppIcon name="film" /><b>{{ t("genres") }}</b>
-          </legend>
-          <div class="genre-legend">
-            <span><i class="include" />{{ t("include") }}</span
-            ><span><i class="exclude" />{{ t("exclude") }}</span
-            ><span><i />{{ t("neutral") }}</span>
-          </div>
-          <div class="genre-grid">
-            <button
-              v-for="genre in sortedGenres"
-              :key="genre.id"
-              type="button"
-              :class="['genre-toggle', genreState(draft, genre.id)]"
-              :aria-label="genreLabel(genre)"
-              @click="toggleGenre(genre.id)"
-            >
-              <AppIcon
-                :name="
-                  genreState(draft, genre.id) === 'include'
-                    ? 'plus'
-                    : genreState(draft, genre.id) === 'exclude'
-                      ? 'x'
-                      : 'circle'
-                "
-                :size="15"
-              />{{ genre.name }}
-            </button>
-          </div>
-        </fieldset>
+        <GenreFilterField
+          :filters="draft"
+          :genres="genres"
+          :translate="t"
+          @update="Object.assign(draft, $event)"
+        />
         <fieldset class="filter-card keyword-card compact-keyword-card">
           <legend>
             <AppIcon name="sparkles" /><b>{{ t("keywords") }}</b>

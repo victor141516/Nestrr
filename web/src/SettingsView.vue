@@ -7,7 +7,6 @@ const {
   ACCENT_COLORS,
   accentColor,
   accentSaving,
-  confirmMetadata,
   library,
   saveSettings,
   selectAccentColor,
@@ -90,14 +89,5 @@ const {
         <AppIcon name="check" />{{ t("saveChanges") }}
       </button>
     </form>
-    <div class="panel settings-card">
-      <div class="panel-title">
-        <span><AppIcon name="library" /></span>
-        <h2>{{ t("storedMetadata") }}</h2>
-      </div>
-      <button class="danger-outline" @click="confirmMetadata = true">
-        <AppIcon name="trash" />{{ t("clear") }}
-      </button>
-    </div>
   </section>
 </template>

@@ -275,7 +275,7 @@ func intersectIDs(groups ...[]int) []int {
 	return result
 }
 
-func (s *Store) LocalMediaForPeople(ctx context.Context, userID int64, language, mediaType string, castIDs, directorIDs []int) ([]json.RawMessage, error) {
+func (s *Store) LocalMediaForPeople(ctx context.Context, language, mediaType string, castIDs, directorIDs []int) ([]json.RawMessage, error) {
 	groups := [][]int{}
 	if len(castIDs) > 0 {
 		ids, err := s.mediaIDsForCredits(ctx, mediaType, "cast", "", castIDs)
@@ -296,11 +296,11 @@ func (s *Store) LocalMediaForPeople(ctx context.Context, userID int64, language,
 		return []json.RawMessage{}, nil
 	}
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
-	args := []any{userID, mediaType, language}
+	args := []any{mediaType, NormalizeLanguage(language)}
 	for _, id := range ids {
 		args = append(args, id)
 	}
-	rows, err := s.DB.QueryContext(ctx, `SELECT payload FROM metadata WHERE user_id=? AND media_type=? AND language=? AND tmdb_id IN (`+placeholders+`)`, args...)
+	rows, err := s.DB.QueryContext(ctx, `SELECT payload FROM metadata WHERE media_type=? AND language=? AND tmdb_id IN (`+placeholders+`)`, args...)
 	if err != nil {
 		return nil, err
 	}

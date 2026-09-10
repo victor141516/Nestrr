@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { shallowRef, useTemplateRef, watch } from "vue";
 import { useNestrrApplicationContext } from "./useNestrrApplication";
-import AdvancedMovieFilters from "./AdvancedMovieFilters.vue";
 import AppIcon from "./AppIcon.vue";
 import ContinueWatching from "./ContinueWatching.vue";
 import ExploreToolbar from "./ExploreToolbar.vue";
@@ -40,6 +39,7 @@ const {
   searchStarted,
   searchTotalResults,
   searchType,
+  settleSearch,
   selectSearchType,
   setDownloadedOnly,
   startedFor,
@@ -94,31 +94,23 @@ watch(
       :busy="busy"
       :filter-panel-open="filterPanelOpen"
       :movie-filter-count="movieFilterCount"
+      :movie-filter-draft="movieFilterDraft"
+      :movie-genres="movieGenres"
+      :movie-countries="movieCountries"
+      :filter-options-loading="filterOptionsLoading"
+      :rotten-tomatoes-enabled="rottenTomatoesEnabled"
       :translate="t"
       @submit="doSearch"
+      @settle="settleSearch"
       @select-type="selectSearchType"
       @toggle-filters="
         filterPanelOpen ? (filterPanelOpen = false) : openMovieFilters()
       "
       @change-sort="changeExploreSort"
       @set-downloaded-only="setDownloadedOnly"
+      @apply-filters="applyMovieFilters"
+      @reset-filters="resetMovieFilters"
     />
-    <Transition name="filter-panel-reveal">
-      <div v-if="filterPanelOpen" class="filter-panel-reveal">
-        <div class="filter-panel-reveal-clip">
-          <AdvancedMovieFilters
-            :filters="movieFilterDraft"
-            :genres="movieGenres"
-            :countries="movieCountries"
-            :loading="filterOptionsLoading"
-            :media-type="searchType"
-            :rotten-tomatoes-enabled="rottenTomatoesEnabled"
-            @apply="applyMovieFilters"
-            @reset="resetMovieFilters"
-          />
-        </div>
-      </div>
-    </Transition>
     <div v-if="appliedFilterChips.length" class="active-filter-bar">
       <div>
         <button

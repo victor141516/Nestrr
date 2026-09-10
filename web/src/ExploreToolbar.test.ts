@@ -2,6 +2,7 @@
 import { fireEvent, render } from "@testing-library/vue";
 import { describe, expect, it } from "vitest";
 import ExploreToolbar from "./ExploreToolbar.vue";
+import { createMovieFilters } from "./movieFilters";
 
 const props = {
   query: "",
@@ -11,6 +12,11 @@ const props = {
   busy: false,
   filterPanelOpen: false,
   movieFilterCount: 0,
+  movieFilterDraft: createMovieFilters("en-US"),
+  movieGenres: [],
+  movieCountries: [],
+  filterOptionsLoading: false,
+  rottenTomatoesEnabled: false,
   translate: (key: string) => key,
 };
 
@@ -21,7 +27,7 @@ describe("ExploreToolbar", () => {
       global: { stubs: { AppIcon: true } },
     });
 
-    expect(view.container.querySelector(".segmented-selection")).toBeTruthy();
+    expect(view.container.querySelector(".media-type-selection")).toBeTruthy();
     await fireEvent.click(view.getByRole("button", { name: "shows" }));
     expect(view.emitted().selectType).toEqual([["tv"]]);
   });
@@ -62,9 +68,22 @@ describe("ExploreToolbar", () => {
     });
 
     const search = view.container.querySelector(
-      ".primary.explore-control",
+      ".search-control .primary",
     ) as HTMLButtonElement;
     expect(search.textContent?.trim()).toBe("search");
     expect((search as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("settles the search when focus leaves the search control", async () => {
+    const view = render(ExploreToolbar, {
+      props: { ...props, query: "Dune" },
+      global: { stubs: { AppIcon: true } },
+    });
+    const input = view.container.querySelector(
+      ".search-control input",
+    ) as HTMLInputElement;
+    await fireEvent.focus(input);
+    await fireEvent.focusOut(input, { relatedTarget: document.body });
+    expect(view.emitted().settle).toHaveLength(1);
   });
 });

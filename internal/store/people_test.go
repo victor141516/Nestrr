@@ -10,7 +10,6 @@ import (
 func TestPeopleSearchAndCreditRelations(t *testing.T) {
 	database := testStore(t)
 	ctx := context.Background()
-	user, _ := database.CreateFirstAdmin(ctx, "admin", "hash", "es-ES")
 	people := []Person{
 		{TMDBID: 10, Name: "Margot Robbie", ProfilePath: "/margot.jpg", KnownForDepartment: "Acting", Popularity: 80},
 		{TMDBID: 20, Name: "Martin Scorsese", KnownForDepartment: "Directing", Popularity: 40},
@@ -22,7 +21,7 @@ func TestPeopleSearchAndCreditRelations(t *testing.T) {
 	if err := database.ReplaceMediaCredits(ctx, "movie", 1, people, credits); err != nil {
 		t.Fatal(err)
 	}
-	if err := database.PutMetadata(ctx, user.ID, "movie", 1, "es-ES", []byte(`{"id":1,"title":"Una película"}`)); err != nil {
+	if err := database.PutMetadata(ctx, "movie", 1, "es-ES", []byte(`{"id":1,"title":"Una película"}`)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -30,7 +29,7 @@ func TestPeopleSearchAndCreditRelations(t *testing.T) {
 	if err != nil || len(matches) != 1 || matches[0].TMDBID != 10 {
 		t.Fatalf("unexpected local people search: %#v %v", matches, err)
 	}
-	media, err := database.LocalMediaForPeople(ctx, user.ID, "es-ES", "movie", []int{10}, []int{20})
+	media, err := database.LocalMediaForPeople(ctx, "es-ES", "movie", []int{10}, []int{20})
 	if err != nil || len(media) != 1 {
 		t.Fatalf("unexpected local credit media: %#v %v", media, err)
 	}

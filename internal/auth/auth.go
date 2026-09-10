@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -34,6 +35,8 @@ type Tokens struct {
 	User          store.User `json:"user"`
 	Impersonating bool       `json:"impersonating"`
 }
+
+var ErrInvalidRefresh = errors.New("refresh token is invalid or expired")
 
 func HashPassword(password string) (string, error) {
 	if len(password) < 10 {
@@ -67,14 +70,20 @@ func (m *Manager) Issue(ctx context.Context, user store.User, actorAdminID int64
 func (m *Manager) Rotate(ctx context.Context, raw string) (Tokens, error) {
 	old, err := m.Store.RefreshByHash(ctx, tokenHash(raw))
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, store.ErrRefreshSessionInvalid) {
+			return Tokens{}, ErrInvalidRefresh
+		}
 		return Tokens{}, err
 	}
 	exp, _ := time.Parse(time.RFC3339Nano, old.ExpiresAt)
 	if time.Now().After(exp) {
-		return Tokens{}, errors.New("refresh token expired")
+		return Tokens{}, ErrInvalidRefresh
 	}
 	u, err := m.Store.UserByID(ctx, old.UserID)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Tokens{}, ErrInvalidRefresh
+		}
 		return Tokens{}, err
 	}
 	actor := int64(0)
@@ -93,6 +102,9 @@ func (m *Manager) Rotate(ctx context.Context, raw string) (Tokens, error) {
 		next.ActorAdminID = &actor
 	}
 	if err = m.Store.RotateRefresh(ctx, tokenHash(raw), next); err != nil {
+		if errors.Is(err, store.ErrRefreshSessionInvalid) {
+			return Tokens{}, ErrInvalidRefresh
+		}
 		return Tokens{}, err
 	}
 	return Tokens{AccessToken: access, ExpiresIn: int64(m.AccessTTL.Seconds()), RefreshToken: nextRaw, User: u, Impersonating: actor != 0}, nil

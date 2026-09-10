@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, waitFor } from "@testing-library/vue";
 import { defineComponent, h } from "vue";
+import { createMemoryHistory, createRouter } from "vue-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useRecommendations } from "./useRecommendations";
 
@@ -9,11 +10,20 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+async function testRouter(path = "/recommendations") {
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: "/recommendations", component: { render: () => null } }],
+  });
+  await router.push(path);
+  await router.isReady();
+  return router;
+}
+
 describe("useRecommendations", () => {
-  it("loads local recommendations and replaces results when the media type changes", async () => {
+  it("loads the URL media type and writes canonical selections back to it", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      const tv = url.includes("kind=tv");
+      const tv = String(input).includes("kind=tv");
       return new Response(
         JSON.stringify({
           results: [
@@ -31,6 +41,7 @@ describe("useRecommendations", () => {
       );
     });
     vi.stubGlobal("fetch", fetchMock);
+    const router = await testRouter("/recommendations?type=Shows");
 
     let recommendations!: ReturnType<typeof useRecommendations>;
     render(
@@ -40,11 +51,13 @@ describe("useRecommendations", () => {
           return () => h("span", recommendations.items.value[0]?.id ?? "empty");
         },
       }),
+      { global: { plugins: [router] } },
     );
 
-    await waitFor(() => expect(recommendations.items.value[0]?.id).toBe(1));
-    recommendations.mediaType.value = "tv";
     await waitFor(() => expect(recommendations.items.value[0]?.id).toBe(2));
+    await recommendations.selectMediaType("movie");
+    await waitFor(() => expect(recommendations.items.value[0]?.id).toBe(1));
+    expect(router.currentRoute.value.query.type).toBe("Movies");
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
@@ -57,6 +70,7 @@ describe("useRecommendations", () => {
         return new Promise<Response>(() => {});
       }),
     );
+    const router = await testRouter();
     const view = render(
       defineComponent({
         setup() {
@@ -64,6 +78,7 @@ describe("useRecommendations", () => {
           return () => h("span");
         },
       }),
+      { global: { plugins: [router] } },
     );
     await waitFor(() => expect(signal).toBeDefined());
     view.unmount();

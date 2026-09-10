@@ -30,6 +30,7 @@ import {
   type MovieFilters,
 } from "./movieFilters";
 import { useLatestRequest } from "./useLatestRequest";
+import { useLiveSearchSchedule } from "./useLiveSearchSchedule";
 
 export type ExploreMedia = {
   id: number;
@@ -112,6 +113,14 @@ export function useExplore(options: UseExploreOptions) {
   const exploreRequests = useLatestRequest();
   const filterOptionRequests = useLatestRequest();
   const resultsCache = new Map<string, ExploreResultSet>();
+  let pendingLiveRequest = 0;
+  let latestLocalTextResult: {
+    kind: "movie" | "tv";
+    query: string;
+    result: ExploreResultSet;
+  } | null = null;
+  let settledSearchKey = "";
+  let settledSearchPromise: Promise<void> | null = null;
 
   const visibleItems = computed(() => items.value);
   const movieFilterCount = computed(() =>
@@ -272,13 +281,44 @@ export function useExplore(options: UseExploreOptions) {
   }
 
   function commitResult(result: ExploreResultSet, append = false) {
-    items.value = append ? [...items.value, ...result.items] : result.items;
+    items.value = append
+      ? deduplicateMedia([...items.value, ...result.items])
+      : deduplicateMedia(result.items);
     searchPage.value = result.page;
     searchTotalPages.value = result.totalPages;
     searchTotalResults.value = result.totalResults;
     for (const [key, value] of result.availability || [])
       availability[key] = value;
     if (!result.availability) void checkCards(result.items);
+  }
+
+  function deduplicateMedia(media: ExploreMedia[]) {
+    const seen = new Set<string>();
+    return media.filter((item) => {
+      const key = `${item.media_type || searchType.value}:${item.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  function mergeRemoteAndLocal(remote: ExploreResultSet) {
+    const local = latestLocalTextResult;
+    if (
+      !local ||
+      local.kind !== searchType.value ||
+      local.query !== query.value.trim()
+    )
+      return remote;
+    const mergedItems = deduplicateMedia([
+      ...remote.items,
+      ...local.result.items,
+    ]);
+    return {
+      ...remote,
+      items: mergedItems,
+      totalResults: Math.max(remote.totalResults, mergedItems.length),
+    };
   }
 
   function resultSetWithCurrentItems(): ExploreResultSet {
@@ -333,7 +373,7 @@ export function useExplore(options: UseExploreOptions) {
       totalResults: Number(result.total_results) || next.length,
     };
   }
-  async function fetchTextSearch(
+  async function fetchRemoteTextSearch(
     request: number,
     page = 1,
   ): Promise<ExploreResultSet | null> {
@@ -353,6 +393,48 @@ export function useExplore(options: UseExploreOptions) {
       totalPages: Number(r.total_pages) || 1,
       totalResults: Number(r.total_results) || next.length,
     };
+  }
+  async function fetchLocalTextSearch(
+    request: number,
+    searchQuery: string,
+  ): Promise<ExploreResultSet | null> {
+    const kind = searchType.value;
+    const response = await api<any>(
+      `/catalog/local/search/${kind}?query=${encodeURIComponent(searchQuery)}&limit=40`,
+    );
+    if (!exploreRequests.isLatest(request)) return null;
+    const next = (response.results || []).map((item: any) => ({
+      ...item,
+      media_type: kind,
+    }));
+    return {
+      items: next,
+      page: 1,
+      totalPages: 1,
+      totalResults: Number(response.total_results) || next.length,
+    };
+  }
+
+  async function runLiveLocalSearch(searchQuery: string) {
+    if (downloadedOnly.value || !searchQuery) return;
+    const request = pendingLiveRequest || exploreRequests.begin();
+    try {
+      const result = await fetchLocalTextSearch(request, searchQuery);
+      if (!result || !exploreRequests.isLatest(request)) return;
+      latestLocalTextResult = {
+        kind: searchType.value,
+        query: searchQuery,
+        result,
+      };
+      appliedMovieFilters.value = null;
+      searchMode.value = "text";
+      searchStarted.value = true;
+      commitResult(result);
+      resultsTransitioning.value = false;
+    } catch {
+      // A transient local lookup must not erase the current collection or
+      // prevent the final TMDB search from running.
+    }
   }
   async function fetchDownloaded(
     request: number,
@@ -430,17 +512,43 @@ export function useExplore(options: UseExploreOptions) {
       await loadExploreFromURL();
     else await router.push(target);
   }
-  async function doSearch() {
-    if (!query.value.trim()) return;
-    await navigateExplore(
+  async function performSettledSearch() {
+    const searchQuery = query.value.trim();
+    const key = `${searchType.value}\x00${searchQuery}\x00${downloadedOnly.value}\x00${exploreSort.value}`;
+    if (settledSearchPromise && settledSearchKey === key)
+      return settledSearchPromise;
+    settledSearchKey = key;
+    settledSearchPromise = navigateExplore(
       exploreQuery(
         searchType.value,
-        query.value,
+        searchQuery,
         null,
         downloadedOnly.value,
         exploreSort.value,
       ),
     );
+    try {
+      await settledSearchPromise;
+    } finally {
+      if (settledSearchKey === key) settledSearchPromise = null;
+    }
+  }
+  const liveSearch = useLiveSearchSchedule({
+    query,
+    onInput: () => {
+      pendingLiveRequest = exploreRequests.begin();
+      loadingMore.value = false;
+      busy.value = false;
+      resultsTransitioning.value = false;
+    },
+    onLocal: runLiveLocalSearch,
+    onSettle: performSettledSearch,
+  });
+  async function doSearch() {
+    await liveSearch.settle();
+  }
+  async function settleSearch() {
+    await liveSearch.settle();
   }
   async function loadMovieFilterOptions() {
     const kind = searchType.value;
@@ -711,7 +819,7 @@ export function useExplore(options: UseExploreOptions) {
       session.user?.language,
     );
     searchType.value = state.kind;
-    query.value = state.query;
+    liveSearch.syncQuery(state.query);
     downloadedOnly.value = state.downloaded;
     exploreSort.value = state.sort;
     if (state.filters && !rottenTomatoesEnabled.value) {
@@ -737,17 +845,25 @@ export function useExplore(options: UseExploreOptions) {
         ? "filters"
         : "idle";
     const cacheKey = resultCacheKey();
-    const cached = cachedResult(cacheKey);
-    // A cached destination can replace the current collection synchronously.
-    // Only hide the old collection when the destination must wait on the API.
-    const fade = cached ? null : waitForResultFade();
-    busy.value = true;
+    // Text search is progressively enhanced: SQLite has already supplied a
+    // usable collection. During TMDB reconciliation there must be no cache
+    // commit, loading-state layout change, or transition commit before the
+    // single final replacement.
+    const preserveVisibleTextResults =
+      searchMode.value === "text" && items.value.length > 0;
+    const cached = preserveVisibleTextResults ? null : cachedResult(cacheKey);
+    const fade =
+      cached || preserveVisibleTextResults ? null : waitForResultFade();
+    busy.value = !preserveVisibleTextResults;
     try {
       const freshResult = (async () => {
-        if (searchMode.value !== "idle") await loadMovieFilterOptions();
+        if (searchMode.value === "filters") await loadMovieFilterOptions();
         if (!exploreRequests.isLatest(request)) return null;
         if (downloadedOnly.value) return fetchDownloaded(request);
-        if (searchMode.value === "text") return fetchTextSearch(request, 1);
+        if (searchMode.value === "text") {
+          const remote = await fetchRemoteTextSearch(request, 1);
+          return remote ? mergeRemoteAndLocal(remote) : null;
+        }
         if (searchMode.value === "filters") return fetchFiltered(request, 1);
         return fetchDiscovery(request, 1);
       })();
@@ -884,7 +1000,7 @@ export function useExplore(options: UseExploreOptions) {
         searchMode.value === "filters"
           ? await fetchFiltered(request, searchPage.value + 1)
           : searchMode.value === "text"
-            ? await fetchTextSearch(request, searchPage.value + 1)
+            ? await fetchRemoteTextSearch(request, searchPage.value + 1)
             : await fetchDiscovery(request, searchPage.value + 1);
       if (!next || !exploreRequests.isLatest(request)) return;
       commitResult(next, true);
@@ -1022,6 +1138,7 @@ export function useExplore(options: UseExploreOptions) {
     searchStarted,
     searchTotalResults,
     searchType,
+    settleSearch,
     selectSearchType,
     setDownloadedOnly,
     visibleItems,

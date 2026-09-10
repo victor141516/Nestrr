@@ -62,6 +62,8 @@ type parsedMedia struct {
 	People    []store.Person
 	Credits   []store.MediaCredit
 	Companies []store.Company
+	Genres    []store.Genre
+	Keywords  []store.Keyword
 }
 
 func parseCompleteMedia(mediaType string, expectedID int, payload []byte) (parsedMedia, error) {
@@ -84,15 +86,23 @@ func parseCompleteMedia(mediaType string, expectedID int, payload []byte) (parse
 	}
 
 	features := store.CatalogFeatures{}
+	genres := make([]store.Genre, 0, len(document.Genres))
 	for _, genre := range document.Genres {
 		features.Genres = appendUniqueID(features.Genres, genre.ID)
+		if genre.ID > 0 {
+			genres = append(genres, store.Genre{ID: genre.ID, Name: genre.Name})
+		}
 	}
 	keywords := document.Keywords.Keywords
 	if mediaType == "tv" {
 		keywords = document.Keywords.Results
 	}
+	parsedKeywords := make([]store.Keyword, 0, len(keywords))
 	for _, keyword := range keywords {
 		features.Keywords = appendUniqueID(features.Keywords, keyword.ID)
+		if keyword.ID > 0 {
+			parsedKeywords = append(parsedKeywords, store.Keyword{ID: keyword.ID, Name: keyword.Name})
+		}
 	}
 
 	companies := make([]store.Company, 0, len(document.ProductionCompanies))
@@ -150,7 +160,7 @@ func parseCompleteMedia(mediaType string, expectedID int, payload []byte) (parse
 			Overview: document.Overview, PosterPath: document.PosterPath, BackdropPath: document.BackdropPath,
 			ReleaseDate: releaseDate, VoteAverage: document.VoteAverage, VoteCount: document.VoteCount, Popularity: document.Popularity,
 		},
-		People: people, Credits: credits, Companies: companies,
+		People: people, Credits: credits, Companies: companies, Genres: genres, Keywords: parsedKeywords,
 	}, nil
 }
 

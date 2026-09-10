@@ -12,7 +12,6 @@ services:
       NESTRR_LISTEN_ADDR: :8080
       NESTRR_DATABASE_PATH: /data/nestrr.db
       NESTRR_IMAGE_CACHE_DIR: /cache/images
-      NESTRR_KEYWORD_CACHE_PATH: /data/tmdb-keywords.json.gz
       NESTRR_MOVIE_LIBRARY_ROOT: /library/Movies
       NESTRR_SHOW_LIBRARY_ROOT: /library/Shows
       NESTRR_TMDB_BEARER_TOKEN: ${TMDB_TOKEN:?Set TMDB_TOKEN in .env}

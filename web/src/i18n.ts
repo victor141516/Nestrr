@@ -28,9 +28,8 @@ const en = {
   complete: "Complete",
   configured: "Configured",
   confirm: "Confirm",
-  confirmMetadataDelete: "Clear your stored metadata?",
-  confirmMetadataHelp:
-    "Nestrr will fetch fresh titles, artwork and descriptions the next time they are needed.",
+  confirmMetadataDelete: "Clear shared metadata?",
+  confirmMetadataHelp: "This affects every user.",
   continue: "Continue watching",
   cast: "Cast",
   directors: "Directors",
@@ -321,9 +320,8 @@ const es: Record<keyof typeof en, string> = {
   complete: "Completa",
   configured: "Configurado",
   confirm: "Confirmar",
-  confirmMetadataDelete: "¿Borrar tus metadatos guardados?",
-  confirmMetadataHelp:
-    "Nestrr volverá a obtener títulos, imágenes y descripciones cuando los necesite.",
+  confirmMetadataDelete: "¿Borrar los metadatos compartidos?",
+  confirmMetadataHelp: "Afecta a todos los usuarios.",
   continue: "Seguir viendo",
   cast: "Reparto",
   directors: "Dirección",

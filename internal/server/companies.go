@@ -159,7 +159,7 @@ func (s *Server) localMediaByCompanies(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	results, err := s.Store.LocalMediaForCompanies(r.Context(), user.ID, user.Language, "movie", companyIDs)
+	results, err := s.Store.LocalMediaForCompanies(r.Context(), user.Language, "movie", companyIDs)
 	if err != nil {
 		internal(w, err)
 		return

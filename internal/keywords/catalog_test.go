@@ -9,11 +9,12 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/victor141516/Nestrr/internal/store"
 )
 
 func export(t *testing.T, entries []Entry) []byte {
@@ -50,18 +51,38 @@ func TestSearchesPrefixBeforeInternalMatchesAndResolvesIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalog := New(filepath.Join(t.TempDir(), "keywords.json.gz"), nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	catalog.replace(entries, time.Now())
+	database, err := store.Open(filepath.Join(t.TempDir(), "keywords.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	values := make([]store.Keyword, len(entries))
+	for index, entry := range entries {
+		values[index] = store.Keyword{ID: entry.ID, Name: entry.Name}
+	}
+	if err := database.ReplaceKeywordCatalog(context.Background(), values, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	catalog := New(database, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
-	prefix := catalog.Prefix("super", 10)
+	prefix, err := catalog.Prefix(context.Background(), "super", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(prefix) != 2 || prefix[0].Name != "superhero" || prefix[1].Name != "superhero team" {
 		t.Fatalf("unexpected prefix results: %#v", prefix)
 	}
-	contains := catalog.Contains("super", 10)
+	contains, err := catalog.Contains(context.Background(), "super", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(contains) != 1 || contains[0].Name != "masked superhero" {
 		t.Fatalf("unexpected contains results: %#v", contains)
 	}
-	resolved := catalog.ByIDs([]int{180734, 9715, 180734})
+	resolved, err := catalog.ByIDs(context.Background(), []int{180734, 9715, 180734})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(resolved) != 2 || resolved[0].ID != 180734 || resolved[1].ID != 9715 {
 		t.Fatalf("unexpected resolved results: %#v", resolved)
 	}
@@ -84,18 +105,22 @@ func TestRefreshUsesLatestAvailableExportAndPersistsIt(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	path := filepath.Join(t.TempDir(), "tmdb-keywords.json.gz")
-	catalog := New(path, upstream.Client(), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	database, err := store.Open(filepath.Join(t.TempDir(), "keywords.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	catalog := New(database, upstream.Client(), slog.New(slog.NewTextHandler(io.Discard, nil)))
 	catalog.exportBase = upstream.URL
 	catalog.now = func() time.Time { return now }
 	if err := catalog.refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if requests != 2 || !catalog.Ready() {
-		t.Fatalf("refresh requests=%d ready=%v", requests, catalog.Ready())
+	if requests != 2 || !catalog.Ready(context.Background()) {
+		t.Fatalf("refresh requests=%d ready=%v", requests, catalog.Ready(context.Background()))
 	}
-	stored, err := os.ReadFile(path)
-	if err != nil || !bytes.Equal(stored, payload) {
-		t.Fatalf("persisted export mismatch: %v", err)
+	stored, err := database.SearchKeywords(context.Background(), "super", "prefix", 10)
+	if err != nil || len(stored) != 2 {
+		t.Fatalf("database export mismatch: %#v %v", stored, err)
 	}
 }

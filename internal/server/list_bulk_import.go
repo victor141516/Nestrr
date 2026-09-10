@@ -228,7 +228,7 @@ func (s *Server) resolveTMDBBulkItem(ctx context.Context, user store.User, input
 			}
 			continue
 		}
-		if err := s.Store.PutMetadata(ctx, user.ID, match.MediaType, match.ID, language, detail.Body); err != nil {
+		if err := s.Store.PutMetadata(ctx, match.MediaType, match.ID, language, detail.Body); err != nil {
 			return store.MediaListItem{}, false, err
 		}
 		var document bulkMediaDocument
@@ -311,7 +311,7 @@ func (s *Server) bulkImportMediaList(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	documents, err := s.Store.MediaMetadata(r.Context(), user.ID, user.Language, "en-US")
+	documents, err := s.Store.MediaMetadata(r.Context(), user.Language, "en-US")
 	if err != nil {
 		internal(w, err)
 		return
@@ -385,7 +385,7 @@ func (s *Server) bulkImportMediaList(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if source == "tmdb" {
-			if refreshed, refreshErr := s.Store.MediaMetadata(r.Context(), user.ID, user.Language, "en-US"); refreshErr == nil {
+			if refreshed, refreshErr := s.Store.MediaMetadata(r.Context(), user.Language, "en-US"); refreshErr == nil {
 				documents = refreshed
 				metadataIndex = buildStoredBulkIndex(documents)
 			}

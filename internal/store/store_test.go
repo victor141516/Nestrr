@@ -159,9 +159,9 @@ func TestSeriesCompletionIncludesReleasedSpecials(t *testing.T) {
 	ctx := context.Background()
 	u, _ := s.CreateFirstAdmin(ctx, "admin", "hash", "en-US")
 	showID := 77
-	_ = s.PutMetadata(ctx, u.ID, "tv", showID, "en-US", []byte(`{"id":77,"seasons":[{"season_number":0},{"season_number":1}]}`))
-	_ = s.PutMetadata(ctx, u.ID, "season", showID*1000, "en-US", []byte(`{"episodes":[{"id":700,"air_date":"2020-01-01"}]}`))
-	_ = s.PutMetadata(ctx, u.ID, "season", showID*1000+1, "en-US", []byte(`{"episodes":[{"id":701,"air_date":"2020-01-02"}]}`))
+	_ = s.PutMetadata(ctx, "tv", showID, "en-US", []byte(`{"id":77,"seasons":[{"season_number":0},{"season_number":1}]}`))
+	_ = s.PutMetadata(ctx, "season", showID*1000, "en-US", []byte(`{"episodes":[{"id":700,"air_date":"2020-01-01"}]}`))
+	_ = s.PutMetadata(ctx, "season", showID*1000+1, "en-US", []byte(`{"episodes":[{"id":701,"air_date":"2020-01-02"}]}`))
 	if _, err := s.SetEpisodeWatched(ctx, u.ID, Progress{TMDBID: 701, ShowTMDBID: showID, SeasonNumber: 1, EpisodeNumber: 1}, true); err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestListProgressBackfillsLegacyEpisodeContextFromMetadata(t *testing.T) {
 	}
 	cacheID := 42*1000 + 3
 	payload := []byte(fmt.Sprintf(`{"season_number":3,"episodes":[{"id":%d,"episode_number":7}]}`, p.TMDBID))
-	if err := s.PutMetadata(ctx, u.ID, "season", cacheID, "en-US", payload); err != nil {
+	if err := s.PutMetadata(ctx, "season", cacheID, "en-US", payload); err != nil {
 		t.Fatal(err)
 	}
 	items, err := s.ListProgress(ctx, u.ID)

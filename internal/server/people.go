@@ -233,7 +233,7 @@ func (s *Server) localMediaByPeople(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	results, err := s.Store.LocalMediaForPeople(r.Context(), user.ID, user.Language, "movie", castIDs, directorIDs)
+	results, err := s.Store.LocalMediaForPeople(r.Context(), user.Language, "movie", castIDs, directorIDs)
 	if err != nil {
 		internal(w, err)
 		return

@@ -66,7 +66,6 @@ func (s *Server) Handler() http.Handler {
 		r.Use(s.authenticate)
 		r.Get("/api/v1/me", s.me)
 		r.Patch("/api/v1/me/settings", s.settings)
-		r.Delete("/api/v1/me/metadata", s.clearMetadata)
 		r.Route("/api/v1/admin", func(r chi.Router) {
 			r.Use(s.adminOnly)
 			r.Get("/users", s.listUsers)
@@ -79,7 +78,9 @@ func (s *Server) Handler() http.Handler {
 			r.Get("/state", s.adminState)
 			r.Get("/recommendations/catalog", s.recommendationCatalogStatus)
 			r.Post("/recommendations/catalog/run", s.runRecommendationCatalog)
+			r.Delete("/metadata", s.clearMetadata)
 		})
+		r.Get("/api/v1/catalog/local/search/{kind}", s.localCatalogSearch)
 		r.Get("/api/v1/catalog/*", s.catalog)
 		r.Get("/api/v1/recommendations", s.recommendations)
 		r.Get("/api/v1/keywords/search", s.keywordSearch)
@@ -292,8 +293,15 @@ func (s *Server) refresh(w http.ResponseWriter, r *http.Request) {
 	}
 	t, err := s.Auth.Rotate(r.Context(), raw)
 	if err != nil {
-		clearRefresh(w, s.Config.SecureCookies)
-		problem(w, 401, "invalid_refresh", "The refresh session is invalid or expired.")
+		if errors.Is(err, auth.ErrInvalidRefresh) {
+			clearRefresh(w, s.Config.SecureCookies)
+			problem(w, 401, "invalid_refresh", "The refresh session is invalid or expired.")
+			return
+		}
+		if s.Log != nil {
+			s.Log.Error("refresh session rotation failed", "operation", "auth.refresh", "error", err)
+		}
+		problem(w, http.StatusServiceUnavailable, "refresh_unavailable", "The session could not be refreshed right now.")
 		return
 	}
 	s.sendTokens(w, t, native)
@@ -363,7 +371,7 @@ func (s *Server) settings(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, 200, u)
 }
 func (s *Server) clearMetadata(w http.ResponseWriter, r *http.Request) {
-	if err := s.Store.ClearMetadata(r.Context(), claims(r).UserID); err != nil {
+	if err := s.Store.ClearMetadata(r.Context()); err != nil {
 		internal(w, err)
 		return
 	}
@@ -521,7 +529,7 @@ func (s *Server) adminState(w http.ResponseWriter, r *http.Request) {
 var catalogPath = regexp.MustCompile(`^(search/(movie|tv)|discover/(movie|tv)|genre/(movie|tv)/list|configuration/countries|certification/movie/list|(movie|tv)/\d+/(recommendations|keywords|credits)|collection/\d+(/recommendations)?|(movie|tv)/\d+|tv/\d+/season/\d+(/episode/\d+)?)$`)
 
 func (s *Server) keywordSearch(w http.ResponseWriter, r *http.Request) {
-	if s.Keywords == nil || !s.Keywords.Ready() {
+	if s.Keywords == nil || !s.Keywords.Ready(r.Context()) {
 		problem(w, http.StatusServiceUnavailable, "keyword_catalog_unavailable", "The keyword catalog is unavailable.")
 		return
 	}
@@ -540,7 +548,12 @@ func (s *Server) keywordSearch(w http.ResponseWriter, r *http.Request) {
 			}
 			ids = append(ids, id)
 		}
-		jsonResponse(w, http.StatusOK, map[string]any{"results": s.Keywords.ByIDs(ids)})
+		results, err := s.Keywords.ByIDs(r.Context(), ids)
+		if err != nil {
+			internal(w, err)
+			return
+		}
+		jsonResponse(w, http.StatusOK, map[string]any{"results": results})
 		return
 	}
 
@@ -557,20 +570,25 @@ func (s *Server) keywordSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	phase := r.URL.Query().Get("phase")
 	var results []keywords.Entry
+	var searchErr error
 	switch phase {
 	case "", "prefix":
 		phase = "prefix"
-		results = s.Keywords.Prefix(query, limit)
+		results, searchErr = s.Keywords.Prefix(r.Context(), query, limit)
 	case "contains":
-		results = s.Keywords.Contains(query, limit)
+		results, searchErr = s.Keywords.Contains(r.Context(), query, limit)
 	default:
 		problem(w, http.StatusBadRequest, "invalid_keyword_phase", "Keyword search phase must be prefix or contains.")
+		return
+	}
+	if searchErr != nil {
+		internal(w, searchErr)
 		return
 	}
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"results":   results,
 		"phase":     phase,
-		"updatedAt": s.Keywords.UpdatedAt().UTC().Format(time.RFC3339),
+		"updatedAt": s.Keywords.UpdatedAt(r.Context()).UTC().Format(time.RFC3339),
 	})
 }
 
@@ -591,9 +609,11 @@ func (s *Server) catalog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := r.URL.Query()
+	effectiveLanguage := store.NormalizeLanguage(q.Get("language"))
 	if q.Get("language") == "" {
-		q.Set("language", u.Language)
+		effectiveLanguage = store.NormalizeLanguage(u.Language)
 	}
+	q.Set("language", effectiveLanguage)
 	refresh := q.Get("refresh") == "true"
 	q.Del("refresh")
 	parts := strings.Split(path, "/")
@@ -617,10 +637,10 @@ func (s *Server) catalog(w http.ResponseWriter, r *http.Request) {
 	}
 	// append_to_response creates a richer representation used by Explore (for
 	// example US release/content ratings). It must not be satisfied by, or
-	// overwrite, the user's ordinary cached detail document.
+	// overwrite, the ordinary shared localized detail document.
 	cacheableDetail := cacheableCatalogDetail(detail, q)
 	if cacheableDetail && !refresh {
-		if b, e := s.Store.GetMetadata(r.Context(), c.UserID, kind, id, u.Language); e == nil {
+		if b, e := s.Store.GetMetadata(r.Context(), kind, id, effectiveLanguage); e == nil {
 			if kind == "movie" {
 				s.storeMovieCompanies(r, id, b)
 			}
@@ -639,6 +659,14 @@ func (s *Server) catalog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body := res.Body
+	if len(parts) == 3 && parts[0] == "genre" && (parts[1] == "movie" || parts[1] == "tv") && parts[2] == "list" {
+		var document struct {
+			Genres []store.Genre `json:"genres"`
+		}
+		if json.Unmarshal(res.Body, &document) == nil {
+			_ = s.Store.PutGenreCatalog(r.Context(), parts[1], effectiveLanguage, document.Genres)
+		}
+	}
 	if cacheableDetail && kind == "movie" {
 		s.storeMovieCompanies(r, id, res.Body)
 	}
@@ -648,17 +676,15 @@ func (s *Server) catalog(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if cacheableDetail {
-		if s.Store.PutMetadata(r.Context(), c.UserID, kind, id, u.Language, res.Body) == nil {
-			if persisted, persistedErr := s.Store.GetMetadata(r.Context(), c.UserID, kind, id, u.Language); persistedErr == nil {
+		if s.Store.PutMetadata(r.Context(), kind, id, effectiveLanguage, res.Body) == nil {
+			if persisted, persistedErr := s.Store.GetMetadata(r.Context(), kind, id, effectiveLanguage); persistedErr == nil {
 				body = persisted
 			}
 		}
 		if refresh && kind == "tv" {
-			if err := s.refreshShowHierarchy(r.Context(), c.UserID, id, u.Language, res.Body); err != nil {
+			if err := s.refreshShowHierarchy(r.Context(), id, effectiveLanguage, res.Body); err != nil {
 				s.Log.Warn("show child discovery failed", "operation", "metadata.refresh_hierarchy", "tmdbId", id, "error", err)
 			}
-		} else if refresh && kind == "season" {
-			s.storeNewEpisodes(r.Context(), c.UserID, showID, seasonNumber, u.Language, res.Body)
 		}
 	}
 	if res.Stale {
@@ -667,7 +693,7 @@ func (s *Server) catalog(w http.ResponseWriter, r *http.Request) {
 	jsonBytes(w, res.Status, res.ContentType, s.enrichCatalogRatings(r.Context(), path, body, refresh))
 }
 
-func (s *Server) refreshShowHierarchy(ctx context.Context, userID int64, showID int, language string, showBody []byte) error {
+func (s *Server) refreshShowHierarchy(ctx context.Context, showID int, language string, showBody []byte) error {
 	var show struct {
 		Seasons []struct {
 			SeasonNumber int `json:"season_number"`
@@ -685,33 +711,11 @@ func (s *Server) refreshShowHierarchy(ctx context.Context, userID int64, showID 
 			return err
 		}
 		seasonKey := showID*1000 + season.SeasonNumber
-		if _, err = s.Store.GetMetadata(ctx, userID, "season", seasonKey, language); errors.Is(err, sql.ErrNoRows) {
-			_ = s.Store.PutMetadata(ctx, userID, "season", seasonKey, language, res.Body)
+		if err = s.Store.PutMetadata(ctx, "season", seasonKey, language, res.Body); err != nil {
+			return err
 		}
-		s.storeNewEpisodes(ctx, userID, showID, season.SeasonNumber, language, res.Body)
 	}
 	return nil
-}
-
-func (s *Server) storeNewEpisodes(ctx context.Context, userID int64, showID, seasonNumber int, language string, seasonBody []byte) {
-	var season struct {
-		Episodes []json.RawMessage `json:"episodes"`
-	}
-	if json.Unmarshal(seasonBody, &season) != nil {
-		return
-	}
-	for _, payload := range season.Episodes {
-		var episode struct {
-			EpisodeNumber int `json:"episode_number"`
-		}
-		if json.Unmarshal(payload, &episode) != nil || episode.EpisodeNumber <= 0 {
-			continue
-		}
-		key := showID*1000000 + seasonNumber*1000 + episode.EpisodeNumber
-		if _, err := s.Store.GetMetadata(ctx, userID, "episode", key, language); errors.Is(err, sql.ErrNoRows) {
-			_ = s.Store.PutMetadata(ctx, userID, "episode", key, language, payload)
-		}
-	}
 }
 
 type availabilityInput struct {
@@ -1099,8 +1103,6 @@ func (s *Server) playbackNavigation(w http.ResponseWriter, r *http.Request) {
 		if idx >= 0 && target >= 0 && target < len(doc.Episodes) {
 			item := doc.Episodes[target]
 			item.SeasonNumber = season
-			payload, _ := json.Marshal(item)
-			_ = s.Store.PutMetadata(r.Context(), claims(r).UserID, "episode", item.ID, u.Language, payload)
 			a := s.resolveAvailabilityForUser(r.Context(), claims(r).UserID, availabilityInput{Kind: "episode", TMDBID: item.ID, Show: in.ShowName, ShowTMDBID: in.ShowID, Season: season, Episode: item.EpisodeNumber})
 			jsonResponse(w, 200, map[string]any{"item": item, "showId": in.ShowID, "showName": in.ShowName, "availability": a})
 			return
@@ -1319,20 +1321,16 @@ func (s *Server) listMediaListItems(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	// Older list rows predate stored synopses. Hydrate them once from the
-	// user's cached localized metadata without delaying future list loads.
+	// Resolve the current shared translation first. The denormalized list row
+	// remains a fallback only and never overrides the user's active language.
 	for index := range items {
-		if items[index].Overview != "" {
-			continue
-		}
 		snapshot := s.mediaListSnapshot(r.Context(), claims(r).UserID, items[index].MediaType, items[index].TMDBID)
-		if snapshot.Overview == "" {
+		fallbackTitle := fmt.Sprintf("%s %d", strings.ToUpper(items[index].MediaType), items[index].TMDBID)
+		if snapshot.Title == fallbackTitle {
 			continue
 		}
 		snapshot.AddedAt = items[index].AddedAt
-		if err := s.Store.AddMediaListItem(r.Context(), claims(r).UserID, id, snapshot); err == nil {
-			items[index] = snapshot
-		}
+		items[index] = snapshot
 	}
 	s.enrichMediaListRatings(r.Context(), items)
 	jsonResponse(w, 200, map[string]any{"list": list, "items": items})
@@ -1416,7 +1414,7 @@ func (s *Server) mediaListSnapshot(ctx context.Context, userID int64, kind strin
 	if err != nil {
 		return item
 	}
-	payload, err := s.Store.GetMetadata(ctx, userID, kind, id, u.Language)
+	payload, err := s.Store.GetMetadata(ctx, kind, id, u.Language)
 	if err != nil {
 		return item
 	}

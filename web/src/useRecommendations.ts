@@ -1,7 +1,13 @@
-import { onBeforeUnmount, shallowRef, watch } from "vue";
+import { computed, onBeforeUnmount, shallowRef, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { api } from "./api";
+import {
+  mediaTypeFromQuery,
+  mediaTypeQueryValue,
+  type CatalogMediaType,
+} from "./mediaType";
 
-export type RecommendationMediaType = "movie" | "tv";
+export type RecommendationMediaType = CatalogMediaType;
 
 export type RecommendationItem = {
   id: number;
@@ -29,7 +35,11 @@ type RecommendationResponse = {
 };
 
 export function useRecommendations() {
-  const mediaType = shallowRef<RecommendationMediaType>("movie");
+  const route = useRoute();
+  const router = useRouter();
+  const mediaType = computed<RecommendationMediaType>(() =>
+    mediaTypeFromQuery(route.query.type),
+  );
   const items = shallowRef<RecommendationItem[]>([]);
   const loading = shallowRef(false);
   const error = shallowRef("");
@@ -38,15 +48,16 @@ export function useRecommendations() {
   async function load(): Promise<void> {
     controller?.abort();
     const request = new AbortController();
+    const requestedType = mediaType.value;
     controller = request;
     loading.value = true;
     error.value = "";
     try {
       const response = await api<RecommendationResponse>(
-        `/recommendations?kind=${mediaType.value}&limit=40`,
+        `/recommendations?kind=${requestedType}&limit=40`,
         { signal: request.signal },
       );
-      if (controller !== request) return;
+      if (controller !== request || mediaType.value !== requestedType) return;
       items.value = response.results;
     } catch (reason) {
       if (request.signal.aborted || controller !== request) return;
@@ -56,8 +67,16 @@ export function useRecommendations() {
     }
   }
 
+  async function selectMediaType(
+    value: RecommendationMediaType,
+  ): Promise<void> {
+    await router.push({
+      query: { ...route.query, type: mediaTypeQueryValue(value) },
+    });
+  }
+
   watch(mediaType, () => void load(), { immediate: true });
   onBeforeUnmount(() => controller?.abort());
 
-  return { error, items, load, loading, mediaType };
+  return { error, items, load, loading, mediaType, selectMediaType };
 }

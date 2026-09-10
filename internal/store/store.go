@@ -20,11 +20,12 @@ type TorrentAssociation struct {
 }
 
 func Open(path string) (*Store, error) {
-	db, err := sql.Open("sqlite", path+"?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)")
+	db, err := sql.Open("sqlite", path+"?_pragma=busy_timeout(10000)&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)")
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(1)
+	db.SetMaxOpenConns(8)
+	db.SetMaxIdleConns(8)
 	s := &Store{DB: db}
 	if err := s.migrate(); err != nil {
 		db.Close()
@@ -75,13 +76,12 @@ CREATE TABLE IF NOT EXISTS http_cache (
  expires_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS metadata (
- user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  media_type TEXT NOT NULL,
  tmdb_id INTEGER NOT NULL,
  language TEXT NOT NULL,
  payload BLOB NOT NULL,
  updated_at TEXT NOT NULL,
- PRIMARY KEY(user_id,media_type,tmdb_id,language)
+ PRIMARY KEY(media_type,tmdb_id,language)
 );
 CREATE TABLE IF NOT EXISTS people (
  tmdb_id INTEGER PRIMARY KEY,
@@ -109,6 +109,8 @@ CREATE TABLE IF NOT EXISTS media_credits (
 );
 CREATE INDEX IF NOT EXISTS media_credits_person ON media_credits(person_tmdb_id,media_type,credit_kind,job,media_tmdb_id);
 CREATE INDEX IF NOT EXISTS media_credits_media ON media_credits(media_type,media_tmdb_id);
+CREATE INDEX IF NOT EXISTS media_credits_rank_cast ON media_credits(media_type,person_tmdb_id,media_tmdb_id) WHERE credit_kind='cast' AND billing_order<20;
+CREATE INDEX IF NOT EXISTS media_credits_rank_director ON media_credits(media_type,person_tmdb_id,media_tmdb_id) WHERE credit_kind='crew' AND job IN ('Director','Creator');
 CREATE TABLE IF NOT EXISTS person_searches (
  normalized_query TEXT NOT NULL,
  language TEXT NOT NULL,
@@ -142,6 +144,48 @@ CREATE TABLE IF NOT EXISTS media_companies (
 );
 CREATE INDEX IF NOT EXISTS media_companies_company ON media_companies(company_tmdb_id,media_type,media_tmdb_id);
 CREATE INDEX IF NOT EXISTS media_companies_media ON media_companies(media_type,media_tmdb_id);
+CREATE TABLE IF NOT EXISTS genres (
+ media_type TEXT NOT NULL CHECK(media_type IN ('movie','tv')),
+ tmdb_id INTEGER NOT NULL,
+ PRIMARY KEY(media_type,tmdb_id)
+);
+CREATE TABLE IF NOT EXISTS genre_names (
+ media_type TEXT NOT NULL,
+ genre_tmdb_id INTEGER NOT NULL,
+ language TEXT NOT NULL,
+ name TEXT NOT NULL,
+ normalized_name TEXT NOT NULL,
+ updated_at TEXT NOT NULL,
+ PRIMARY KEY(media_type,genre_tmdb_id,language),
+ FOREIGN KEY(media_type,genre_tmdb_id) REFERENCES genres(media_type,tmdb_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS genre_names_lookup ON genre_names(language,normalized_name,media_type,genre_tmdb_id);
+CREATE TABLE IF NOT EXISTS media_genres (
+ media_type TEXT NOT NULL,
+ media_tmdb_id INTEGER NOT NULL,
+ genre_tmdb_id INTEGER NOT NULL,
+ updated_at TEXT NOT NULL,
+ PRIMARY KEY(media_type,media_tmdb_id,genre_tmdb_id),
+ FOREIGN KEY(media_type,genre_tmdb_id) REFERENCES genres(media_type,tmdb_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS media_genres_genre ON media_genres(media_type,genre_tmdb_id,media_tmdb_id);
+CREATE INDEX IF NOT EXISTS media_genres_media ON media_genres(media_type,media_tmdb_id,genre_tmdb_id);
+CREATE TABLE IF NOT EXISTS keywords (
+ tmdb_id INTEGER PRIMARY KEY,
+ name TEXT NOT NULL DEFAULT '',
+ normalized_name TEXT NOT NULL DEFAULT '',
+ updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS keywords_normalized_name ON keywords(normalized_name,tmdb_id);
+CREATE TABLE IF NOT EXISTS media_keywords (
+ media_type TEXT NOT NULL,
+ media_tmdb_id INTEGER NOT NULL,
+ keyword_tmdb_id INTEGER NOT NULL REFERENCES keywords(tmdb_id) ON DELETE CASCADE,
+ updated_at TEXT NOT NULL,
+ PRIMARY KEY(media_type,media_tmdb_id,keyword_tmdb_id)
+);
+CREATE INDEX IF NOT EXISTS media_keywords_keyword ON media_keywords(media_type,keyword_tmdb_id,media_tmdb_id);
+CREATE INDEX IF NOT EXISTS media_keywords_media ON media_keywords(media_type,media_tmdb_id,keyword_tmdb_id);
 CREATE TABLE IF NOT EXISTS company_searches (
  normalized_query TEXT NOT NULL,
  language TEXT NOT NULL,
@@ -231,6 +275,7 @@ CREATE TABLE IF NOT EXISTS media_list_items (
  PRIMARY KEY(list_id,media_type,tmdb_id)
 );
 CREATE INDEX IF NOT EXISTS media_list_items_added ON media_list_items(list_id,added_at DESC);
+CREATE INDEX IF NOT EXISTS media_list_items_media ON media_list_items(media_type,tmdb_id,list_id);
 CREATE TABLE IF NOT EXISTS torrent_associations (
  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  media_type TEXT NOT NULL,
@@ -258,6 +303,25 @@ CREATE TABLE IF NOT EXISTS catalog_media (
  PRIMARY KEY(media_type,tmdb_id)
 );
 CREATE INDEX IF NOT EXISTS catalog_media_rating ON catalog_media(media_type,vote_average DESC,vote_count DESC);
+CREATE TABLE IF NOT EXISTS catalog_media_titles (
+ media_type TEXT NOT NULL CHECK(media_type IN ('movie','tv')),
+ media_tmdb_id INTEGER NOT NULL,
+ source TEXT NOT NULL CHECK(source IN ('catalog','metadata')),
+ language TEXT NOT NULL DEFAULT '',
+ title TEXT NOT NULL,
+ normalized_title TEXT NOT NULL,
+ PRIMARY KEY(media_type,media_tmdb_id,source,language,title)
+);
+CREATE INDEX IF NOT EXISTS catalog_media_titles_lookup ON catalog_media_titles(media_type,normalized_title,media_tmdb_id);
+CREATE VIRTUAL TABLE IF NOT EXISTS catalog_media_titles_fts USING fts5(
+ normalized_title,
+ media_type UNINDEXED,
+ media_tmdb_id UNINDEXED,
+ source UNINDEXED,
+ language UNINDEXED,
+ title UNINDEXED,
+ tokenize='trigram'
+);
 CREATE TABLE IF NOT EXISTS recommendation_candidates (
  media_type TEXT NOT NULL CHECK(media_type IN ('movie','tv')),
  tmdb_id INTEGER NOT NULL,
@@ -291,6 +355,9 @@ CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)
 	if _, err := s.DB.Exec(schema); err != nil {
 		return err
 	}
+	if err := s.migrateSharedMetadata(); err != nil {
+		return err
+	}
 	if err := s.ensureColumn("users", "accent_color", "TEXT NOT NULL DEFAULT '#ff624f'"); err != nil {
 		return err
 	}
@@ -320,7 +387,138 @@ CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)
 	if _, err := s.DB.Exec("UPDATE progress SET started=1,started_at=COALESCE(started_at,updated_at) WHERE started=0 AND (position_seconds>0 OR watched=1)"); err != nil {
 		return err
 	}
+	if err := s.migrateCatalogRelations(); err != nil {
+		return err
+	}
+	if err := s.migrateCatalogMediaTitles(); err != nil {
+		return err
+	}
+	if err := s.migrateCatalogMediaTitleFTS(); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (s *Store) migrateSharedMetadata() error {
+	hasUserID, err := s.tableHasColumn("metadata", "user_id")
+	if err != nil || !hasUserID {
+		return err
+	}
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.Exec("DROP TABLE IF EXISTS metadata_shared_migration"); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(`CREATE TABLE metadata_shared_migration (
+		media_type TEXT NOT NULL,
+		tmdb_id INTEGER NOT NULL,
+		language TEXT NOT NULL,
+		payload BLOB NOT NULL,
+		updated_at TEXT NOT NULL,
+		PRIMARY KEY(media_type,tmdb_id,language)
+	)`); err != nil {
+		return err
+	}
+	rows, err := tx.Query(`SELECT user_id,media_type,tmdb_id,language,payload,updated_at
+		FROM metadata ORDER BY updated_at,user_id`)
+	if err != nil {
+		return err
+	}
+	type legacyDocument struct {
+		mediaType, language, updatedAt string
+		tmdbID                         int
+		payload                        []byte
+	}
+	documents := []legacyDocument{}
+	for rows.Next() {
+		var userID int64
+		var document legacyDocument
+		if err := rows.Scan(&userID, &document.mediaType, &document.tmdbID, &document.language, &document.payload, &document.updatedAt); err != nil {
+			rows.Close()
+			return err
+		}
+		documents = append(documents, document)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for _, document := range documents {
+		if _, err = tx.Exec(`INSERT INTO metadata_shared_migration(media_type,tmdb_id,language,payload,updated_at)
+			VALUES(?,?,?,?,?) ON CONFLICT(media_type,tmdb_id,language) DO UPDATE SET
+			payload=excluded.payload,updated_at=excluded.updated_at`, document.mediaType, document.tmdbID,
+			NormalizeLanguage(document.language), document.payload, document.updatedAt); err != nil {
+			return err
+		}
+	}
+	if _, err = tx.Exec("DROP TABLE metadata"); err != nil {
+		return err
+	}
+	if _, err = tx.Exec("ALTER TABLE metadata_shared_migration RENAME TO metadata"); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Store) migrateCatalogRelations() error {
+	const migrationKey = "catalog_relations_v1"
+	var completed string
+	if err := s.DB.QueryRow("SELECT value FROM app_state WHERE key=?", migrationKey).Scan(&completed); err == nil && completed == "complete" {
+		return nil
+	} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	statements := []struct {
+		query string
+		args  []any
+	}{
+		{`INSERT OR IGNORE INTO genres(media_type,tmdb_id)
+		 SELECT media_type,CAST(value AS INTEGER) FROM catalog_media,json_each(catalog_media.features,'$.genres') WHERE CAST(value AS INTEGER)>0`, nil},
+		{`INSERT OR IGNORE INTO media_genres(media_type,media_tmdb_id,genre_tmdb_id,updated_at)
+		 SELECT media_type,tmdb_id,CAST(value AS INTEGER),? FROM catalog_media,json_each(catalog_media.features,'$.genres') WHERE CAST(value AS INTEGER)>0`, []any{now}},
+		{`INSERT OR IGNORE INTO keywords(tmdb_id,name,normalized_name,updated_at)
+		 SELECT DISTINCT CAST(value AS INTEGER),'','',? FROM catalog_media,json_each(catalog_media.features,'$.keywords') WHERE CAST(value AS INTEGER)>0`, []any{now}},
+		{`INSERT OR IGNORE INTO media_keywords(media_type,media_tmdb_id,keyword_tmdb_id,updated_at)
+		 SELECT media_type,tmdb_id,CAST(value AS INTEGER),? FROM catalog_media,json_each(catalog_media.features,'$.keywords') WHERE CAST(value AS INTEGER)>0`, []any{now}},
+	}
+	for _, statement := range statements {
+		if _, err := tx.Exec(statement.query, statement.args...); err != nil {
+			return err
+		}
+	}
+	if _, err = tx.Exec(`INSERT INTO app_state(key,value) VALUES(?,?)
+		ON CONFLICT(key) DO UPDATE SET value=excluded.value`, migrationKey, "complete"); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Store) tableHasColumn(table, name string) (bool, error) {
+	rows, err := s.DB.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid, notNull, primaryKey int
+		var columnName, columnType string
+		var defaultValue any
+		if err := rows.Scan(&cid, &columnName, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
+			return false, err
+		}
+		if columnName == name {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }
 
 func (s *Store) ensureColumn(table, name, definition string) error {
@@ -502,6 +700,8 @@ type RefreshSession struct {
 	ActorAdminID             *int64
 }
 
+var ErrRefreshSessionInvalid = errors.New("refresh session is invalid")
+
 func (s *Store) SaveRefresh(ctx context.Context, r RefreshSession, rotatedFrom string) error {
 	_, err := s.DB.ExecContext(ctx, "INSERT INTO refresh_sessions(id,token_hash,user_id,actor_admin_id,expires_at,created_at,rotated_from) VALUES(?,?,?,?,?,?,?)", r.ID, r.TokenHash, r.UserID, r.ActorAdminID, r.ExpiresAt, time.Now().UTC().Format(time.RFC3339Nano), nullable(rotatedFrom))
 	return err
@@ -512,20 +712,17 @@ func (s *Store) RotateRefresh(ctx context.Context, oldHash string, next RefreshS
 		return err
 	}
 	defer tx.Rollback()
-	var oldID string
-	var expires, revoked sql.NullString
-	if err = tx.QueryRowContext(ctx, "SELECT id,expires_at,revoked_at FROM refresh_sessions WHERE token_hash=?", oldHash).Scan(&oldID, &expires, &revoked); err != nil {
-		return err
-	}
-	if revoked.Valid {
-		return errors.New("refresh session already used")
-	}
-	exp, _ := time.Parse(time.RFC3339Nano, expires.String)
-	if time.Now().After(exp) {
-		return errors.New("refresh session expired")
-	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	if _, err = tx.ExecContext(ctx, "UPDATE refresh_sessions SET revoked_at=? WHERE id=? AND revoked_at IS NULL", now, oldID); err != nil {
+	var oldID string
+	err = tx.QueryRowContext(ctx, `
+		UPDATE refresh_sessions
+		SET revoked_at=?
+		WHERE token_hash=? AND revoked_at IS NULL AND expires_at>?
+		RETURNING id`, now, oldHash, now).Scan(&oldID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrRefreshSessionInvalid
+	}
+	if err != nil {
 		return err
 	}
 	if _, err = tx.ExecContext(ctx, "INSERT INTO refresh_sessions(id,token_hash,user_id,actor_admin_id,expires_at,created_at,rotated_from) VALUES(?,?,?,?,?,?,?)", next.ID, next.TokenHash, next.UserID, next.ActorAdminID, next.ExpiresAt, now, oldID); err != nil {
@@ -538,13 +735,16 @@ func (s *Store) RefreshByHash(ctx context.Context, hash string) (RefreshSession,
 	var actor sql.NullInt64
 	var revoked sql.NullString
 	err := s.DB.QueryRowContext(ctx, "SELECT id,token_hash,user_id,actor_admin_id,expires_at,revoked_at FROM refresh_sessions WHERE token_hash=?", hash).Scan(&r.ID, &r.TokenHash, &r.UserID, &actor, &r.ExpiresAt, &revoked)
+	if err != nil {
+		return r, err
+	}
 	if actor.Valid {
 		r.ActorAdminID = &actor.Int64
 	}
 	if revoked.Valid {
-		return r, errors.New("refresh session revoked")
+		return r, ErrRefreshSessionInvalid
 	}
-	return r, err
+	return r, nil
 }
 func (s *Store) RevokeRefresh(ctx context.Context, hash string) error {
 	_, err := s.DB.ExecContext(ctx, "UPDATE refresh_sessions SET revoked_at=? WHERE token_hash=? AND revoked_at IS NULL", time.Now().UTC().Format(time.RFC3339Nano), hash)
@@ -555,17 +755,43 @@ func (s *Store) Audit(ctx context.Context, actor, target int64, action string, d
 	b, _ := json.Marshal(details)
 	_, _ = s.DB.ExecContext(ctx, "INSERT INTO audit_log(actor_user_id,target_user_id,action,details,occurred_at) VALUES(?,?,?,?,?)", actor, target, action, string(b), time.Now().UTC().Format(time.RFC3339Nano))
 }
-func (s *Store) ClearMetadata(ctx context.Context, userID int64) error {
-	_, err := s.DB.ExecContext(ctx, "DELETE FROM metadata WHERE user_id=?", userID)
-	return err
+func (s *Store) ClearMetadata(ctx context.Context) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, "DELETE FROM metadata"); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, "DELETE FROM catalog_media_titles WHERE source='metadata'"); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, "DELETE FROM catalog_media_titles_fts WHERE source='metadata'"); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
-func (s *Store) PutMetadata(ctx context.Context, userID int64, kind string, id int, language string, payload []byte) error {
-	_, err := s.DB.ExecContext(ctx, "INSERT INTO metadata(user_id,media_type,tmdb_id,language,payload,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(user_id,media_type,tmdb_id,language) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at", userID, kind, id, language, payload, time.Now().UTC().Format(time.RFC3339Nano))
-	return err
+func (s *Store) PutMetadata(ctx context.Context, kind string, id int, language string, payload []byte) error {
+	language = NormalizeLanguage(language)
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, "INSERT INTO metadata(media_type,tmdb_id,language,payload,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(media_type,tmdb_id,language) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at", kind, id, language, payload, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
+		return err
+	}
+	if kind == "movie" || kind == "tv" {
+		if err = replaceCatalogTitleAliases(ctx, tx, kind, id, "metadata", language, mediaTitleAliases(kind, language, payload, "", "")); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
-func (s *Store) GetMetadata(ctx context.Context, userID int64, kind string, id int, language string) ([]byte, error) {
+func (s *Store) GetMetadata(ctx context.Context, kind string, id int, language string) ([]byte, error) {
 	var b []byte
-	err := s.DB.QueryRowContext(ctx, "SELECT payload FROM metadata WHERE user_id=? AND media_type=? AND tmdb_id=? AND language=?", userID, kind, id, language).Scan(&b)
+	err := s.DB.QueryRowContext(ctx, "SELECT payload FROM metadata WHERE media_type=? AND tmdb_id=? AND language=?", kind, id, NormalizeLanguage(language)).Scan(&b)
 	return b, err
 }
 
@@ -745,7 +971,7 @@ func (s *Store) ListProgress(ctx context.Context, userID int64) ([]Progress, err
 // opened, so it can be used to migrate those rows lazily and without a TMDB
 // request on every series visit.
 func (s *Store) enrichLegacyEpisodeContext(ctx context.Context, userID int64, p *Progress) {
-	rows, err := s.DB.QueryContext(ctx, "SELECT media_type,tmdb_id,payload FROM metadata WHERE user_id=? AND media_type IN ('season','episode') ORDER BY CASE media_type WHEN 'season' THEN 0 ELSE 1 END", userID)
+	rows, err := s.DB.QueryContext(ctx, "SELECT media_type,tmdb_id,payload FROM metadata WHERE media_type IN ('season','episode') ORDER BY CASE media_type WHEN 'season' THEN 0 ELSE 1 END")
 	if err != nil {
 		return
 	}
@@ -1077,7 +1303,7 @@ func (s *Store) SetEpisodeWatched(ctx context.Context, userID int64, p Progress,
 // deliberately included, so released specials participate in completion.
 func (s *Store) ShowFullyWatched(ctx context.Context, userID int64, showID int) (bool, error) {
 	var showPayload []byte
-	err := s.DB.QueryRowContext(ctx, `SELECT payload FROM metadata WHERE user_id=? AND media_type='tv' AND tmdb_id=? ORDER BY updated_at DESC LIMIT 1`, userID, showID).Scan(&showPayload)
+	err := s.DB.QueryRowContext(ctx, `SELECT payload FROM metadata WHERE media_type='tv' AND tmdb_id=? ORDER BY updated_at DESC LIMIT 1`, showID).Scan(&showPayload)
 	if err != nil {
 		return false, err
 	}
@@ -1100,7 +1326,7 @@ func (s *Store) ShowFullyWatched(ctx context.Context, userID int64, showID int) 
 	}
 	released := map[int]bool{}
 	loaded := map[int]bool{}
-	rows, err := s.DB.QueryContext(ctx, `SELECT tmdb_id,payload FROM metadata WHERE user_id=? AND media_type='season' AND tmdb_id>=? AND tmdb_id<? ORDER BY updated_at DESC`, userID, showID*1000, (showID+1)*1000)
+	rows, err := s.DB.QueryContext(ctx, `SELECT tmdb_id,payload FROM metadata WHERE media_type='season' AND tmdb_id>=? AND tmdb_id<? ORDER BY updated_at DESC`, showID*1000, (showID+1)*1000)
 	if err != nil {
 		return false, err
 	}
@@ -1230,7 +1456,7 @@ func boolInt(v bool) int {
 }
 func (s *Store) DebugCounts(ctx context.Context) (map[string]int, error) {
 	out := map[string]int{}
-	for _, t := range []string{"users", "metadata", "people", "media_credits", "person_searches", "person_search_results", "companies", "media_companies", "company_searches", "company_search_results", "external_ratings", "image_assets", "http_cache", "availability", "progress", "media_lists", "media_list_items", "torrent_associations", "catalog_media", "recommendation_candidates", "recommendation_discovery_cursors", "recommendation_runs"} {
+	for _, t := range []string{"users", "metadata", "people", "media_credits", "person_searches", "person_search_results", "companies", "media_companies", "genres", "genre_names", "media_genres", "keywords", "media_keywords", "company_searches", "company_search_results", "external_ratings", "image_assets", "http_cache", "availability", "progress", "media_lists", "media_list_items", "torrent_associations", "catalog_media", "recommendation_candidates", "recommendation_discovery_cursors", "recommendation_runs"} {
 		var n int
 		if err := s.DB.QueryRowContext(ctx, fmt.Sprintf("SELECT count(*) FROM %s", t)).Scan(&n); err != nil {
 			return nil, err

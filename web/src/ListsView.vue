@@ -3,6 +3,7 @@ import { shallowRef, watch } from "vue";
 import { useNestrrApplicationContext } from "./useNestrrApplication";
 import AppIcon from "./AppIcon.vue";
 import BulkListImport from "./BulkListImport.vue";
+import ListToolbar from "./ListToolbar.vue";
 import ListMediaRow from "./ListMediaRow.vue";
 import type { BulkImportEvent } from "./useBulkListImport";
 
@@ -18,14 +19,16 @@ const {
   listEditor,
   listMediaType,
   listSort,
-  loadListsPage,
   mediaLists,
   membershipsFor,
   pathOnly,
   pendingRemovalFor,
   systemListName,
+  setListMediaType,
+  setListSort,
   t,
   title,
+  toggleListDirection,
   toggleRowList,
 } = useNestrrApplicationContext();
 
@@ -137,41 +140,15 @@ function onBulkImported(event: BulkImportEvent) {
         @imported="onBulkImported"
         @finished="finishBulkImport"
       />
-      <div class="list-toolbar">
-        <label
-          >{{ t("contentType") }}
-          <select v-model="listMediaType" @change="loadListsPage()">
-            <option value="all">{{ t("all") }}</option>
-            <option value="movie">{{ t("movies") }}</option>
-            <option value="tv">{{ t("shows") }}</option>
-          </select>
-        </label>
-        <label
-          >{{ t("sortBy") }}
-          <select v-model="listSort" @change="loadListsPage()">
-            <option value="addedAt">{{ t("dateAdded") }}</option>
-            <option value="title">{{ t("titleLabel") }}</option>
-            <option value="releaseDate">{{ t("releaseDate") }}</option>
-            <option value="rating">{{ t("rating") }}</option>
-            <option value="popularity">{{ t("popularity") }}</option>
-            <option value="runtime">{{ t("runtime") }}</option>
-          </select>
-        </label>
-        <button
-          class="sort-direction"
-          :aria-label="t('sortDirection')"
-          :title="t('sortDirection')"
-          @click="
-            listDirection = listDirection === 'desc' ? 'asc' : 'desc';
-            loadListsPage();
-          "
-        >
-          <AppIcon
-            name="arrowUp"
-            :class="{ descending: listDirection === 'desc' }"
-          />
-        </button>
-      </div>
+      <ListToolbar
+        :media-type="listMediaType"
+        :sort="listSort"
+        :direction="listDirection"
+        :translate="t"
+        @select-media-type="setListMediaType"
+        @select-sort="setListSort"
+        @toggle-direction="toggleListDirection"
+      />
       <div v-if="activeListItems.length" class="list-media-rows">
         <ListMediaRow
           v-for="item in activeListItems"

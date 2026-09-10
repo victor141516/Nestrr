@@ -98,8 +98,9 @@ export function useAdministration(options: Options) {
   }
 
   async function clearMetadata() {
-    await api("/me/metadata", { method: "DELETE" });
+    await api("/admin/metadata", { method: "DELETE" });
     confirmMetadata.value = false;
+    await loadAdmin();
     flash(t("clear"));
   }
   async function addUser(ev: Event) {

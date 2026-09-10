@@ -177,7 +177,7 @@ func (s *Store) CachedCompanySearch(ctx context.Context, query, language string,
 	return companies, true, err
 }
 
-func (s *Store) LocalMediaForCompanies(ctx context.Context, userID int64, language, mediaType string, companyIDs []int) ([]json.RawMessage, error) {
+func (s *Store) LocalMediaForCompanies(ctx context.Context, language, mediaType string, companyIDs []int) ([]json.RawMessage, error) {
 	companyIDs = uniquePositiveIDs(companyIDs)
 	if len(companyIDs) == 0 {
 		return []json.RawMessage{}, nil
@@ -187,10 +187,10 @@ func (s *Store) LocalMediaForCompanies(ctx context.Context, userID int64, langua
 	for _, id := range companyIDs {
 		args = append(args, id)
 	}
-	args = append(args, len(companyIDs), userID, mediaType, language)
+	args = append(args, len(companyIDs), mediaType, NormalizeLanguage(language))
 	rows, err := s.DB.QueryContext(ctx, `SELECT m.payload FROM metadata m JOIN (
 		SELECT media_tmdb_id FROM media_companies WHERE media_type=? AND company_tmdb_id IN (`+placeholders+`) GROUP BY media_tmdb_id HAVING COUNT(DISTINCT company_tmdb_id)=?
-	) related ON related.media_tmdb_id=m.tmdb_id WHERE m.user_id=? AND m.media_type=? AND m.language=?`, args...)
+	) related ON related.media_tmdb_id=m.tmdb_id WHERE m.media_type=? AND m.language=?`, args...)
 	if err != nil {
 		return nil, err
 	}

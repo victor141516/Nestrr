@@ -10,7 +10,6 @@ import (
 func TestCompanySearchAndMediaRelations(t *testing.T) {
 	database := testStore(t)
 	ctx := context.Background()
-	user, _ := database.CreateFirstAdmin(ctx, "admin", "hash", "es-ES")
 	companies := []Company{
 		{TMDBID: 1, Name: "Appian Way", OriginCountry: "US"},
 		{TMDBID: 2, Name: "Sikelia Productions", OriginCountry: "US"},
@@ -18,14 +17,14 @@ func TestCompanySearchAndMediaRelations(t *testing.T) {
 	if err := database.ReplaceMediaCompanies(ctx, "movie", 42, companies); err != nil {
 		t.Fatal(err)
 	}
-	if err := database.PutMetadata(ctx, user.ID, "movie", 42, "es-ES", []byte(`{"id":42,"title":"Película"}`)); err != nil {
+	if err := database.PutMetadata(ctx, "movie", 42, "es-ES", []byte(`{"id":42,"title":"Película"}`)); err != nil {
 		t.Fatal(err)
 	}
 	matches, err := database.SearchCompanies(ctx, "appian", 12)
 	if err != nil || len(matches) != 1 || matches[0].TMDBID != 1 {
 		t.Fatalf("unexpected company search: %#v %v", matches, err)
 	}
-	media, err := database.LocalMediaForCompanies(ctx, user.ID, "es-ES", "movie", []int{1, 2})
+	media, err := database.LocalMediaForCompanies(ctx, "es-ES", "movie", []int{1, 2})
 	if err != nil || len(media) != 1 {
 		t.Fatalf("unexpected related media: %#v %v", media, err)
 	}

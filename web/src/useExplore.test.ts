@@ -377,4 +377,98 @@ describe("useExplore downloaded dataset", () => {
     await loading;
     expect(explore.visibleItems.value[0]?.title).toBe("TMDB collaboration");
   });
+
+  it("shows throttled SQLite results while typing and merges the settled TMDB response", async () => {
+    vi.useFakeTimers();
+    let resolveRemote!: (value: any) => void;
+    const remoteResponse = new Promise<any>((resolve) => {
+      resolveRemote = resolve;
+    });
+    const exploreBusy = ref(false);
+    vi.mocked(api).mockImplementation((path) => {
+      const requestPath = String(path);
+      if (requestPath.includes("/catalog/local/search/movie"))
+        return Promise.resolve({
+          page: 1,
+          total_pages: 1,
+          total_results: 2,
+          results: [
+            { id: 1, title: "Malditos bastardos" },
+            { id: 2, title: "Malditos local" },
+          ],
+        });
+      if (requestPath.includes("/genre/movie/list"))
+        return Promise.resolve({ genres: [] });
+      if (requestPath.includes("/configuration/countries"))
+        return Promise.resolve([]);
+      if (requestPath.includes("/catalog/search/movie")) return remoteResponse;
+      throw new Error(`Unexpected request: ${requestPath}`);
+    });
+    const route = reactive({ path: "/", fullPath: "/", query: {} as any });
+    const router = {
+      resolve: vi.fn((target: { query: Record<string, string> }) => ({
+        fullPath: `/?${new URLSearchParams(target.query).toString()}`,
+      })),
+      push: vi.fn(),
+    };
+    let explore!: ReturnType<typeof useExplore>;
+    const Harness = defineComponent({
+      setup() {
+        explore = useExplore({
+          router: router as any,
+          currentRoute: route as any,
+          pathOnly: ref("/") as any,
+          busy: exploreBusy,
+          error: ref(""),
+          availability: reactive({}),
+          checkCards: vi.fn().mockResolvedValue(undefined),
+          rottenTomatoesEnabled: ref(false),
+          t: (key) => key,
+          title: (media) => media.title || media.name || "",
+        });
+        return () => null;
+      },
+    });
+    render(Harness);
+
+    explore.query.value = "ma";
+    await vi.advanceTimersByTimeAsync(40);
+    explore.query.value = "malditos";
+    await vi.advanceTimersByTimeAsync(40);
+    await Promise.resolve();
+    expect(api).toHaveBeenCalledTimes(1);
+    expect(api).toHaveBeenCalledWith(
+      expect.stringContaining("/catalog/local/search/movie?query=malditos"),
+    );
+    expect(explore.visibleItems.value.map((item) => item.id)).toEqual([1, 2]);
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(router.push).toHaveBeenCalledWith({
+      path: "/",
+      query: { type: "Movies", q: "malditos" },
+    });
+
+    route.query = { type: "Movies", q: "malditos" };
+    route.fullPath = "/?type=Movies&q=malditos";
+    const loading = explore.loadExploreFromURL();
+    await Promise.resolve();
+    expect(explore.visibleItems.value.map((item) => item.id)).toEqual([1, 2]);
+    expect(explore.resultsTransitioning.value).toBe(false);
+    expect(exploreBusy.value).toBe(false);
+
+    resolveRemote({
+      page: 1,
+      total_pages: 3,
+      total_results: 41,
+      results: [
+        { id: 1, title: "Malditos bastardos" },
+        { id: 3, title: "Malditos TMDB" },
+      ],
+    });
+    await loading;
+    expect(explore.visibleItems.value.map((item) => item.id)).toEqual([
+      1, 3, 2,
+    ]);
+    expect(explore.searchTotalResults.value).toBe(41);
+  });
 });

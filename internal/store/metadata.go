@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// MetadataDocument is a persisted, user-scoped TMDB document. The store keeps
+// MetadataDocument is a persisted, shared localized TMDB document. The store keeps
 // the payload opaque; interpretation belongs to the server feature that owns
 // the lookup.
 type MetadataDocument struct {
@@ -15,14 +15,14 @@ type MetadataDocument struct {
 	Payload   []byte
 }
 
-func (s *Store) MediaMetadata(ctx context.Context, userID int64, languages ...string) ([]MetadataDocument, error) {
-	query := "SELECT media_type,tmdb_id,language,payload FROM metadata WHERE user_id=? AND media_type IN ('movie','tv')"
-	args := []any{userID}
+func (s *Store) MediaMetadata(ctx context.Context, languages ...string) ([]MetadataDocument, error) {
+	query := "SELECT media_type,tmdb_id,language,payload FROM metadata WHERE media_type IN ('movie','tv')"
+	args := []any{}
 	if len(languages) > 0 {
 		placeholders := make([]string, 0, len(languages))
 		for _, language := range languages {
 			placeholders = append(placeholders, "?")
-			args = append(args, language)
+			args = append(args, NormalizeLanguage(language))
 		}
 		query += " AND language IN (" + strings.Join(placeholders, ",") + ")"
 	}

@@ -40,7 +40,7 @@ func main() {
 	client := &http.Client{Timeout: 20 * time.Second}
 	integration := integrations.New(cfg.JackettHost, cfg.JackettAPIKey, cfg.QBittorrentHost, cfg.QBittorrentUsername, cfg.QBittorrentPassword, cfg.QBittorrentShowCategory, cfg.QBittorrentMovieCategory, log)
 	integration.Start(ctx)
-	keywordCatalog := keywords.New(cfg.KeywordCachePath, client, log)
+	keywordCatalog := keywords.New(db, client, log)
 	keywordCatalog.Start(ctx)
 	ratingService := &ratings.Service{MDBListBaseURL: cfg.MDBListBaseURL, MDBListAPIKey: cfg.MDBListAPIKey, OMDbBaseURL: cfg.OMDbBaseURL, OMDbAPIKey: cfg.OMDbAPIKey, HTTP: client, Store: db, Log: log}
 	tmdbClient := &tmdb.Client{BaseURL: cfg.TMDBBaseURL, Token: cfg.TMDBBearerToken, TTL: cfg.TMDBCacheTTL, HTTP: client, Store: db, Log: log}

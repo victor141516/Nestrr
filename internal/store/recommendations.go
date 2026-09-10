@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -60,6 +61,10 @@ func (s *Store) PutCatalogMedia(ctx context.Context, media CatalogMedia) error {
 	if !validCatalogKey(media.CatalogKey) || len(media.Payload) == 0 || len(media.Features) == 0 {
 		return fmt.Errorf("invalid complete catalog media")
 	}
+	var features CatalogFeatures
+	if err := json.Unmarshal(media.Features, &features); err != nil {
+		return fmt.Errorf("invalid catalog features: %w", err)
+	}
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -72,8 +77,33 @@ func (s *Store) PutCatalogMedia(ctx context.Context, media CatalogMedia) error {
 		media.MediaType, media.TMDBID, media.Payload, media.Features, media.Title, media.OriginalTitle, media.Overview, media.PosterPath, media.BackdropPath, media.ReleaseDate, media.VoteAverage, media.VoteCount, media.Popularity, now); err != nil {
 		return err
 	}
+	if err = replaceCatalogTitleAliases(ctx, tx, media.MediaType, media.TMDBID, "catalog", "", mediaTitleAliases(media.MediaType, "", media.Payload, media.Title, media.OriginalTitle)); err != nil {
+		return err
+	}
 	if _, err = tx.ExecContext(ctx, "DELETE FROM recommendation_candidates WHERE media_type=? AND tmdb_id=?", media.MediaType, media.TMDBID); err != nil {
 		return err
+	}
+	if _, err = tx.ExecContext(ctx, "DELETE FROM media_genres WHERE media_type=? AND media_tmdb_id=?", media.MediaType, media.TMDBID); err != nil {
+		return err
+	}
+	for _, genreID := range uniquePositiveIDs(features.Genres) {
+		if _, err = tx.ExecContext(ctx, "INSERT OR IGNORE INTO genres(media_type,tmdb_id) VALUES(?,?)", media.MediaType, genreID); err != nil {
+			return err
+		}
+		if _, err = tx.ExecContext(ctx, "INSERT INTO media_genres(media_type,media_tmdb_id,genre_tmdb_id,updated_at) VALUES(?,?,?,?)", media.MediaType, media.TMDBID, genreID, now); err != nil {
+			return err
+		}
+	}
+	if _, err = tx.ExecContext(ctx, "DELETE FROM media_keywords WHERE media_type=? AND media_tmdb_id=?", media.MediaType, media.TMDBID); err != nil {
+		return err
+	}
+	for _, keywordID := range uniquePositiveIDs(features.Keywords) {
+		if _, err = tx.ExecContext(ctx, "INSERT OR IGNORE INTO keywords(tmdb_id,name,normalized_name,updated_at) VALUES(?, '', '', ?)", keywordID, now); err != nil {
+			return err
+		}
+		if _, err = tx.ExecContext(ctx, "INSERT INTO media_keywords(media_type,media_tmdb_id,keyword_tmdb_id,updated_at) VALUES(?,?,?,?)", media.MediaType, media.TMDBID, keywordID, now); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }

@@ -209,12 +209,12 @@ func (s *Service) run(ctx context.Context, id int64) {
 		return
 	}
 
-	catalog, err := s.Store.CatalogMediaRankingEntries(ctx)
+	seedFeatures, err := s.Store.CatalogFeaturesForKeys(ctx, seedKeys)
 	if err != nil {
 		s.finish(ctx, id, err)
 		return
 	}
-	signals := signalsForSeeds(catalog, seeds)
+	signals := signalsForSeeds(seedFeatures, seeds)
 	tasks := discoveryTasks(signals)
 	s.update(ctx, id, func(status *RunStatus) {
 		status.Phase = "discovery"
@@ -269,18 +269,11 @@ func (s signalSet) counts() SignalCounts {
 	return SignalCounts{Genres: len(s.Genres), Keywords: len(s.Keywords), Actors: len(s.Actors), Directors: len(s.Directors), Companies: len(s.Companies)}
 }
 
-func signalsForSeeds(catalog []store.CatalogMedia, seeds []store.RecommendationSeed) signalSet {
-	seedKeys := map[store.CatalogKey]bool{}
-	for _, seed := range seeds {
-		seedKeys[seed.CatalogKey] = true
-	}
+func signalsForSeeds(featuresByKey map[store.CatalogKey]store.CatalogFeatures, seeds []store.RecommendationSeed) signalSet {
 	result := signalSet{Genres: map[int]bool{}, Keywords: map[int]bool{}, Actors: map[int]bool{}, Directors: map[int]bool{}, Companies: map[int]bool{}}
-	for _, media := range catalog {
-		if !seedKeys[media.CatalogKey] {
-			continue
-		}
-		var features store.CatalogFeatures
-		if json.Unmarshal(media.Features, &features) != nil {
+	for _, seed := range seeds {
+		features, ok := featuresByKey[seed.CatalogKey]
+		if !ok {
 			continue
 		}
 		addIDs(result.Genres, features.Genres)
@@ -504,6 +497,12 @@ func (s *Service) hydrate(ctx context.Context, key store.CatalogKey) error {
 		return err
 	}
 	if err = s.Store.ReplaceMediaCompanies(ctx, key.MediaType, key.TMDBID, parsed.Companies); err != nil {
+		return err
+	}
+	if err = s.Store.ReplaceMediaGenres(ctx, key.MediaType, key.TMDBID, "en-US", parsed.Genres); err != nil {
+		return err
+	}
+	if err = s.Store.ReplaceMediaKeywords(ctx, key.MediaType, key.TMDBID, parsed.Keywords); err != nil {
 		return err
 	}
 	return s.Store.PutCatalogMedia(ctx, parsed.Catalog)
