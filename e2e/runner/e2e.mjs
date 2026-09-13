@@ -50,7 +50,7 @@ try {
   await page.getByRole("button", { name: "Create administrator" }).click();
 
   console.log("[e2e] Verifying the three mock movies rendered from mock TMDB");
-  await page.getByRole("heading", { name: title }).waitFor();
+  await page.locator(".media-card").filter({ hasText: title }).waitFor();
   for (const mockTitle of [title, "Jurassic Park", "Alien"]) {
     await page.getByText(mockTitle, { exact: true }).first().waitFor();
   }
@@ -59,7 +59,7 @@ try {
     "[e2e] Verifying RouterLink navigation and combining URL-backed filters",
   );
   assert.match(
-    await page.getByRole("link", { name: "Nestrr home" }).getAttribute("href"),
+    await page.getByRole("link", { name: "Nestrr", exact: true }).getAttribute("href"),
     /#\/$/,
   );
   assert.match(
@@ -67,7 +67,7 @@ try {
       .getByRole("link", { name: /Explore/ })
       .first()
       .getAttribute("href"),
-    /#\/explore$/,
+    /#\/$/,
   );
   assert.match(
     await page.locator(".media-card").first().getAttribute("href"),
@@ -138,6 +138,7 @@ try {
   await filters.getByRole("button", { name: /Show results/ }).click();
   await page.getByText("Temporal Horizon", { exact: true }).first().waitFor();
   await page.getByText("Jurassic Park", { exact: true }).first().waitFor();
+  await page.getByText("Alien", { exact: true }).waitFor({ state: "hidden" });
   assert.equal(
     await page.getByText("Alien", { exact: true }).count(),
     0,
@@ -190,7 +191,7 @@ try {
       .inputValue(),
     "16",
   );
-  await filters.locator(".close").click();
+  await page.getByRole("button", { name: /Filters/ }).click();
 
   console.log(
     "[e2e] Verifying the filter panel at the 390px mobile breakpoint",
@@ -198,9 +199,11 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: /Filters/ }).click();
   await filters.waitFor();
+  await page.waitForFunction(() => document.getAnimations().every(animation => animation.playState !== "running"));
   const mobileLayout = await page.evaluate(() => ({
     viewport: window.innerWidth,
     documentWidth: document.documentElement.scrollWidth,
+    overflowing: [...document.querySelectorAll("body *")].filter(element => element.getBoundingClientRect().right > window.innerWidth + 1).slice(0, 12).map(element => ({tag: element.tagName, class: element.className, parent: element.parentElement?.className, text: element.textContent?.slice(0,120), right: element.getBoundingClientRect().right})),
   }));
   assert(
     mobileLayout.documentWidth <= mobileLayout.viewport,
@@ -209,14 +212,14 @@ try {
   await filters
     .getByRole("button", { name: /Show results/ })
     .waitFor({ state: "visible" });
-  await filters.locator(".close").click();
+  await page.getByRole("button", { name: /Filters/ }).click();
   await page.setViewportSize({ width: 1440, height: 900 });
 
   console.log(
     "[e2e] Switching to TV filters without leaking movie genre IDs or runtime",
   );
-  await page.getByRole("button", { name: "Series", exact: true }).click();
-  await page.waitForURL(/type=tv/);
+  await page.getByRole("button", { name: "Shows", exact: true }).click();
+  await page.waitForURL(/type=Shows/);
   const tvExploreParams = new URLSearchParams(
     new URL(page.url()).hash.split("?")[1],
   );
@@ -229,12 +232,10 @@ try {
     await filters.getByRole("group", { name: "Runtime" }).count(),
     0,
   );
-  await filters.locator(".close").click();
+  await page.getByRole("button", { name: /Filters/ }).click();
 
-  await page.getByRole("link", { name: /Home/ }).first().click();
-  await page.getByRole("heading", { name: title }).waitFor();
-
-  await page.getByRole("link", { name: "View details" }).click();
+  await page.getByRole("link", { name: "Nestrr", exact: true }).click();
+  await page.locator(".media-card").filter({ hasText: title }).click();
   await page.getByRole("heading", { name: title }).waitFor();
   await page
     .locator(".facts")
@@ -372,14 +373,10 @@ try {
   );
 
   console.log("[e2e] Reloading Nestrr's filesystem-backed library");
-  await page
-    .getByRole("link", { name: /Downloaded/ })
-    .first()
-    .click();
-  await page
-    .locator(".library-list a", { hasText: title })
-    .waitFor({ timeout: 15_000 });
-  await page.locator(".library-list a", { hasText: title }).click();
+  await page.getByRole("link", { name: "Nestrr", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Downloaded only" }).check();
+  await page.locator(".media-card").filter({ hasText: title }).waitFor({ timeout: 15_000 });
+  await page.locator(".media-card").filter({ hasText: title }).click();
   await page.getByRole("button", { name: /Play/ }).waitFor({ timeout: 15_000 });
 
   console.log("[e2e] Opening Plarr and proving the real video clock advances");
@@ -407,7 +404,7 @@ try {
   );
 
   console.log("[e2e] Closing Plarr and removing playback from the URL");
-  await frame.getByRole("button", { name: "Back" }).click();
+  await frame.getByRole("button", { name: "Back", exact: true }).click();
   await page.locator("iframe.player-frame").waitFor({ state: "detached" });
   assert.equal(
     new URLSearchParams(new URL(page.url()).hash.split("?")[1]).get("play"),

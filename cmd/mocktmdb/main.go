@@ -102,6 +102,10 @@ func fixture(w http.ResponseWriter, r *http.Request) {
 					}
 				case "/recommendations":
 					v = page([]any{})
+				case "/credits":
+					v = map[string]any{"id": id, "cast": []any{}, "crew": []any{}}
+				case "/keywords":
+					v = map[string]any{"id": id, "keywords": []any{}}
 				case "/translations":
 					v = map[string]any{"id": id, "translations": []any{map[string]any{"iso_3166_1": "US", "iso_639_1": "en", "english_name": "English", "data": map[string]any{"title": movie["title"]}}}}
 				}

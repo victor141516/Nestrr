@@ -1,0 +1,10 @@
+# Linux AMD / Intel: export RENDER_GID=$(stat -c %g /dev/dri/renderD128)
+# docker compose -f docker-compose.yml -f docker-compose.vaapi.yml up -d --build
+services:
+  plarr:
+    environment:
+      PLARR_HARDWARE_ACCELERATION: ${PLARR_HARDWARE_ACCELERATION:-amd,intel}
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "${RENDER_GID:?Set RENDER_GID from the render device group}"

@@ -62,6 +62,7 @@ func (s *Server) Handler() http.Handler {
 	r.Post("/api/v1/auth/login", s.login)
 	r.Post("/api/v1/auth/refresh", s.refresh)
 	r.Post("/api/v1/auth/logout", s.logout)
+	r.Get("/api/v1/auth/media-check", s.mediaCheck)
 	r.Group(func(r chi.Router) {
 		r.Use(s.authenticate)
 		r.Get("/api/v1/me", s.me)
@@ -295,6 +296,7 @@ func (s *Server) refresh(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidRefresh) {
 			clearRefresh(w, s.Config.SecureCookies)
+			s.clearMediaCookie(w)
 			problem(w, 401, "invalid_refresh", "The refresh session is invalid or expired.")
 			return
 		}
@@ -312,10 +314,15 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 		_ = s.Auth.Revoke(r.Context(), raw)
 	}
 	clearRefresh(w, s.Config.SecureCookies)
+	s.clearMediaCookie(w)
 	w.WriteHeader(http.StatusNoContent)
 }
 func (s *Server) sendTokens(w http.ResponseWriter, t auth.Tokens, native bool) {
 	if !native {
+		if err := s.setMediaCookie(w, t); err != nil {
+			internal(w, err)
+			return
+		}
 		http.SetCookie(w, &http.Cookie{Name: "nestrr_refresh", Value: t.RefreshToken, Path: "/api/v1/auth", HttpOnly: true, Secure: s.Config.SecureCookies, SameSite: http.SameSiteStrictMode, MaxAge: int(s.Config.RefreshTTL.Seconds())})
 		t.RefreshToken = ""
 	}

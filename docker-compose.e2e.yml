@@ -112,8 +112,8 @@ services:
         condition: service_healthy
     environment:
       NESTRR_LISTEN_ADDR: :8080
-      NESTRR_DATABASE_PATH: /state/nestrr.db
-      NESTRR_IMAGE_CACHE_DIR: /state/images
+      NESTRR_DATABASE_PATH: /data/nestrr.db
+      NESTRR_IMAGE_CACHE_DIR: /data/images
       NESTRR_MOVIE_LIBRARY_ROOT: /library/Movies
       NESTRR_SHOW_LIBRARY_ROOT: /library/Shows
       NESTRR_TMDB_BEARER_TOKEN: e2e-token
@@ -133,9 +133,9 @@ services:
       NESTRR_PUBLIC_ORIGIN: http://nestrr:8080
       NESTRR_LOG_LEVEL: debug
     volumes:
-      - type: bind
-        source: ${NESTRR_E2E_RUNTIME}/nestrr-state
-        target: /state
+      # SQLite WAL requires filesystem locking that Windows bind mounts cannot
+      # reliably provide. This project-scoped volume is removed by the runner.
+      - nestrr-state:/data
       - type: bind
         source: ${NESTRR_E2E_RUNTIME}/data/library
         target: /library
@@ -164,3 +164,6 @@ services:
         source: ${NESTRR_E2E_RUNTIME}
         target: /runtime
     shm_size: 1gb
+
+volumes:
+  nestrr-state:

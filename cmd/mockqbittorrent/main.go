@@ -134,7 +134,7 @@ func materializeVideo() {
 		return
 	}
 	partial, final := filepath.Join(incomplete, releaseFile), filepath.Join(completed, releaseFile)
-	cmd := exec.Command("ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=24", "-f", "lavfi", "-i", "sine=frequency=880:sample_rate=48000", "-t", "8", "-c:v", "libvpx-vp9", "-deadline", "realtime", "-cpu-used", "8", "-b:v", "500k", "-pix_fmt", "yuv420p", "-c:a", "libopus", partial)
+	cmd := exec.Command("ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=24", "-f", "lavfi", "-i", "sine=frequency=880:sample_rate=48000", "-t", "8", "-c:v", "libvpx-vp9", "-deadline", "realtime", "-cpu-used", "8", "-b:v", "500k", "-pix_fmt", "yuv420p", "-c:a", "libopus", partial)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		setError(fmt.Errorf("ffmpeg: %w: %s", err, output))
 		return

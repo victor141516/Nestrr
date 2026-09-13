@@ -42,6 +42,7 @@ type Config struct {
 	LogLevel                 slog.Level
 	FrontendDir              string
 	SecureCookies            bool
+	MediaCookieDomain        string
 }
 
 func Load() (Config, error) {
@@ -73,6 +74,7 @@ func Load() (Config, error) {
 		AccessTTL:                duration("NESTRR_ACCESS_TOKEN_TTL", 2*time.Hour),
 		RefreshTTL:               duration("NESTRR_REFRESH_TOKEN_TTL", 30*24*time.Hour),
 		PublicOrigin:             strings.TrimRight(env("NESTRR_PUBLIC_ORIGIN", "http://localhost:8080"), "/"),
+		MediaCookieDomain:        strings.TrimPrefix(strings.ToLower(strings.TrimSpace(os.Getenv("NESTRR_MEDIA_COOKIE_DOMAIN"))), "."),
 		TrustedProxy:             boolean("NESTRR_TRUSTED_PROXY", false),
 		LogLevel:                 level("NESTRR_LOG_LEVEL", slog.LevelInfo),
 		FrontendDir:              env("NESTRR_FRONTEND_DIR", filepath.Join(cwd, "web", "dist")),
@@ -90,6 +92,14 @@ func Load() (Config, error) {
 		return c, errors.New("NESTRR_PUBLIC_ORIGIN must be an absolute URL")
 	} else {
 		c.SecureCookies = u.Scheme == "https"
+	}
+	if c.MediaCookieDomain != "" {
+		nestrrURL, _ := url.Parse(c.PublicOrigin)
+		plarrURL, err := url.Parse(c.PlarrHost)
+		domain := "." + c.MediaCookieDomain
+		if err != nil || !strings.Contains(c.MediaCookieDomain, ".") || !c.SecureCookies || plarrURL.Scheme != "https" || !strings.HasSuffix(nestrrURL.Hostname(), domain) || !strings.HasSuffix(plarrURL.Hostname(), domain) {
+			return c, errors.New("NESTRR_MEDIA_COOKIE_DOMAIN must be a shared parent of the HTTPS Nestrr and Plarr hosts")
+		}
 	}
 	if err := os.MkdirAll(filepath.Dir(c.DatabasePath), 0o750); err != nil {
 		return c, err

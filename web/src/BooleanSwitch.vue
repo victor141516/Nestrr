@@ -20,6 +20,7 @@ function update(event: Event): void {
 
 <style scoped>
 .boolean-switch {
+  position: relative;
   display: inline-flex;
   height: 44px;
   align-items: center;
@@ -36,6 +37,11 @@ function update(event: Event): void {
 
 .boolean-switch input {
   position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
   opacity: 0;
 }
 

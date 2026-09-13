@@ -1,0 +1,75 @@
+name: nestrr-tilde
+
+services:
+  nestrr:
+    container_name: nestrr
+    image: nestrr:tilde-20260913
+    build: ./Nestrr
+    restart: unless-stopped
+    env_file:
+      - /home/victor141516/secrets/chiprr/env
+      - /home/victor141516/secrets/nestrr/env
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ['export NESTRR_TMDB_BEARER_TOKEN="$$TMDB_TOKEN"; exec nestrr']
+    environment:
+      NESTRR_LISTEN_ADDR: :8080
+      NESTRR_DATABASE_PATH: /data/nestrr.db
+      NESTRR_IMAGE_CACHE_DIR: /cache/images
+      NESTRR_MOVIE_LIBRARY_ROOT: /library/Movies
+      NESTRR_SHOW_LIBRARY_ROOT: /library/Shows
+      NESTRR_PUBLIC_ORIGIN: https://nestrr.viti.site
+      NESTRR_MEDIA_COOKIE_DOMAIN: viti.site
+      NESTRR_PLARR_HOST: https://plarr.viti.site
+      NESTRR_PLARR_INTERNAL_HOST: http://plarr:8090
+      NESTRR_JACKETT_HOST: http://jackett:9117
+      NESTRR_QBITTORRENT_HOST: http://qbittorrent:8080
+      NESTRR_QBITTORRENT_SHOW_CATEGORY: Shows
+      NESTRR_QBITTORRENT_MOVIE_CATEGORY: Movies
+    volumes:
+      - ./data:/data
+      - ./images:/cache/images
+      - /media/victor141516/18t1/sorted-movies-final:/library/Movies:ro
+      - /media/victor141516/18t1/sorted:/library/Shows:ro
+    networks: [media, caddywork]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+
+  plarr:
+    container_name: plarr
+    image: plarr:tilde-amd-20260913
+    build: ./Plarr
+    restart: unless-stopped
+    cpus: 4
+    environment:
+      PLARR_LISTEN_ADDR: :8090
+      PLARR_MEDIA_ROOT: /media
+      PLARR_CACHE_DIR: /cache
+      PLARR_CACHE_LIMIT: 20GB
+      PLARR_HARDWARE_ACCELERATION: amd
+      PLARR_PUBLIC_ORIGIN: https://plarr.viti.site
+      PLARR_ALLOWED_PARENT_ORIGINS: https://nestrr.viti.site
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "44"
+      - "${RENDER_GID:?Set RENDER_GID from stat -c %g /dev/dri/renderD128}"
+    volumes:
+      - ./plarr-cache:/cache
+      - /media/victor141516/18t1/sorted-movies-final:/media/Movies:ro
+      - /media/victor141516/18t1/sorted:/media/Shows:ro
+    networks: [media, caddywork]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8090/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+
+networks:
+  media:
+    external: true
+    name: jellyfin_default
+  caddywork:
+    external: true
