@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -62,7 +63,6 @@ func (s *Server) Handler() http.Handler {
 	r.Post("/api/v1/auth/login", s.login)
 	r.Post("/api/v1/auth/refresh", s.refresh)
 	r.Post("/api/v1/auth/logout", s.logout)
-	r.Get("/api/v1/auth/media-check", s.mediaCheck)
 	r.Group(func(r chi.Router) {
 		r.Use(s.authenticate)
 		r.Get("/api/v1/me", s.me)
@@ -97,6 +97,7 @@ func (s *Server) Handler() http.Handler {
 		r.Get("/api/v1/progress", s.listProgress)
 		r.Get("/api/v1/progress/{kind}/{id}", s.getProgress)
 		r.Post("/api/v1/playback/events", s.playbackEvent)
+		r.Post("/api/v1/playback/grant", s.playbackGrant)
 		r.Post("/api/v1/playback/navigation", s.playbackNavigation)
 		r.Post("/api/v1/progress/{kind}/{id}/watched", s.setWatched)
 		r.Post("/api/v1/progress/episodes/watched", s.setEpisodesWatched)
@@ -296,7 +297,6 @@ func (s *Server) refresh(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidRefresh) {
 			clearRefresh(w, s.Config.SecureCookies)
-			s.clearMediaCookie(w)
 			problem(w, 401, "invalid_refresh", "The refresh session is invalid or expired.")
 			return
 		}
@@ -314,15 +314,10 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 		_ = s.Auth.Revoke(r.Context(), raw)
 	}
 	clearRefresh(w, s.Config.SecureCookies)
-	s.clearMediaCookie(w)
 	w.WriteHeader(http.StatusNoContent)
 }
 func (s *Server) sendTokens(w http.ResponseWriter, t auth.Tokens, native bool) {
 	if !native {
-		if err := s.setMediaCookie(w, t); err != nil {
-			internal(w, err)
-			return
-		}
 		http.SetCookie(w, &http.Cookie{Name: "nestrr_refresh", Value: t.RefreshToken, Path: "/api/v1/auth", HttpOnly: true, Secure: s.Config.SecureCookies, SameSite: http.SameSiteStrictMode, MaxAge: int(s.Config.RefreshTTL.Seconds())})
 		t.RefreshToken = ""
 	}
@@ -747,6 +742,77 @@ type availabilityOutput struct {
 	OriginalDownloadURL string                    `json:"originalDownloadUrl,omitempty"`
 	Error               string                    `json:"error,omitempty"`
 	Torrent             *integrations.TorrentInfo `json:"torrent,omitempty"`
+}
+
+type playbackGrantOutput struct {
+	PlayerURL           string `json:"playerUrl"`
+	OriginalDownloadURL string `json:"originalDownloadUrl"`
+	PlaybackToken       string `json:"playbackToken,omitempty"`
+}
+
+func (s *Server) playbackGrant(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	var in availabilityInput
+	if !decode(w, r, &in) {
+		return
+	}
+	availability := s.resolveAvailability(r.Context(), in)
+	if !availability.Available || availability.RelativePath == "" || in.Kind == "show" {
+		problem(w, http.StatusNotFound, "media_unavailable", "The requested media is not available for playback.")
+		return
+	}
+	encoded := base64.RawURLEncoding.EncodeToString([]byte(availability.RelativePath))
+	result := playbackGrantOutput{
+		PlayerURL:           s.Config.PlarrHost + "/#/play/" + encoded,
+		OriginalDownloadURL: s.Config.PlarrHost + "/api/v1/media/" + encoded + "/download/original",
+	}
+	if s.Config.PlarrAPIKey == "" {
+		jsonResponse(w, http.StatusCreated, result)
+		return
+	}
+	body, err := json.Marshal(map[string]string{
+		"apiKey":  s.Config.PlarrAPIKey,
+		"mediaId": encoded,
+	})
+	if err != nil {
+		internal(w, err)
+		return
+	}
+	request, err := http.NewRequestWithContext(r.Context(), http.MethodPost, s.Config.PlarrInternalHost+"/api/v1/auth/playback-grants", bytes.NewReader(body))
+	if err != nil {
+		internal(w, err)
+		return
+	}
+	request.Header.Set("Content-Type", "application/json")
+	client := s.HTTP
+	if client == nil {
+		client = http.DefaultClient
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		problem(w, http.StatusBadGateway, "plarr_unavailable", "Playback authorization is unavailable.")
+		return
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusCreated {
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
+		problem(w, http.StatusBadGateway, "plarr_grant_failed", "Playback authorization could not be created.")
+		return
+	}
+	var grant struct {
+		PlaybackToken string `json:"playbackToken"`
+	}
+	if err = json.NewDecoder(io.LimitReader(response.Body, 4096)).Decode(&grant); err != nil || grant.PlaybackToken == "" {
+		problem(w, http.StatusBadGateway, "plarr_grant_invalid", "Playback authorization returned an invalid response.")
+		return
+	}
+	result.PlaybackToken = grant.PlaybackToken
+	downloadURL, _ := url.Parse(result.OriginalDownloadURL)
+	query := downloadURL.Query()
+	query.Set("playback_token", grant.PlaybackToken)
+	downloadURL.RawQuery = query.Encode()
+	result.OriginalDownloadURL = downloadURL.String()
+	jsonResponse(w, http.StatusCreated, result)
 }
 
 func (s *Server) resolveAvailability(ctx context.Context, in availabilityInput) availabilityOutput {

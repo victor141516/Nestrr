@@ -222,12 +222,12 @@ export function useNestrrApplication() {
     autoplay,
     cancelAutoplay,
     closePlayer,
+    downloadMedia,
     navigateEpisode,
     onPlayerMessage,
     playDetail,
     playEpisode,
     player,
-    renditionURL,
     restorePlayerFromRoute,
   } = usePlaybackHost({
     router,
@@ -242,6 +242,7 @@ export function useNestrrApplication() {
     flash,
     go,
     loadListState,
+    mediaInput,
   });
   const {
     addUser,
@@ -449,6 +450,7 @@ export function useNestrrApplication() {
     detail,
     detailProgress,
     doSearch,
+    downloadMedia,
     downloadedOnly,
     episodeDisplayTitle,
     episodeImagePath,
@@ -510,7 +512,6 @@ export function useNestrrApplication() {
     ready,
     refreshDetail,
     removeMovieFilter,
-    renditionURL,
     resetMovieFilters,
     resultsTransitioning,
     rottenTomatoesEnabled,

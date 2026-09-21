@@ -50,6 +50,7 @@ type UsePlaybackHostOptions = {
   flash: (message: string) => void;
   go: (path: string) => void;
   loadListState: () => Promise<void>;
+  mediaInput: (media: any, kind?: string) => unknown;
 };
 
 export function usePlaybackHost(options: UsePlaybackHostOptions) {
@@ -66,12 +67,14 @@ export function usePlaybackHost(options: UsePlaybackHostOptions) {
     flash,
     go,
     loadListState,
+    mediaInput,
   } = options;
   const player = ref<{
     url: string;
     origin: string;
     item: PlaybackItem;
     kind: string;
+    renewalAttempts: number;
   } | null>(null);
   const playbackGate = reactive({
     sessionID: "",
@@ -82,6 +85,8 @@ export function usePlaybackHost(options: UsePlaybackHostOptions) {
     hadProgress: false,
   });
   let playbackEventRevision = 0;
+  let playerOpenRevision = 0;
+  let pendingPlayerKey = "";
   const {
     countdown: autoplay,
     schedule: scheduleAutoplayCountdown,
@@ -109,6 +114,8 @@ export function usePlaybackHost(options: UsePlaybackHostOptions) {
     };
   }
   function closePlayer(syncRoute = true) {
+    playerOpenRevision++;
+    pendingPlayerKey = "";
     cancelAutoplay();
     player.value = null;
     if (!syncRoute || !wantsPlayback.value) return;
@@ -117,18 +124,40 @@ export function usePlaybackHost(options: UsePlaybackHostOptions) {
     if (window.history.state?.back === targetPath) router.back();
     else void router.replace(target);
   }
-  function openPlayer(
+  async function playbackGrant(m: PlaybackItem, kind: string) {
+    return api<{
+      playerUrl: string;
+      originalDownloadUrl: string;
+      playbackToken?: string;
+    }>("/playback/grant", {
+      method: "POST",
+      body: JSON.stringify(mediaInput(m, kind)),
+    });
+  }
+  async function openPlayer(
     m: PlaybackItem,
     a: PlaybackAvailability,
     kind = "movie",
     syncRoute = true,
-  ) {
+    restore?: { startSeconds?: number; renewalAttempts?: number },
+  ): Promise<void> {
     if (!a?.playerUrl) return;
+    const requestKey = `${kind}:${m.id}:${restore?.renewalAttempts ?? 0}`;
+    if (pendingPlayerKey === requestKey) return;
+    pendingPlayerKey = requestKey;
+    const revision = ++playerOpenRevision;
+    const grant = await playbackGrant(m, kind).catch((reason: unknown) => {
+      flash(reason instanceof Error ? reason.message : "Playback unavailable");
+      return null;
+    });
+    if (pendingPlayerKey === requestKey) pendingPlayerKey = "";
+    if (!grant || revision !== playerOpenRevision) return;
     const pref = progress.value.find(
       (p) => p.mediaType === kind && p.tmdbId === m.id,
     );
     const params = new URLSearchParams();
-    if (pref?.resumeSeconds) params.set("start", String(pref.resumeSeconds));
+    const startSeconds = restore?.startSeconds ?? pref?.resumeSeconds;
+    if (startSeconds) params.set("start", String(startSeconds));
     const audio = preferredAudioLanguage(
       pref?.audioLanguage,
       session.user?.language,
@@ -146,8 +175,16 @@ export function usePlaybackHost(options: UsePlaybackHostOptions) {
       kind === "episode" ? (m as any).show || title(m) : title(m);
     if (catalogTitle) params.set("title", catalogTitle);
     params.set("parentOrigin", location.origin);
-    const url = a.playerUrl + (params.size ? "?" + params : "");
-    player.value = { url, origin: new URL(a.playerUrl).origin, item: m, kind };
+    if (grant.playbackToken)
+      params.set("playbackToken", grant.playbackToken);
+    const url = grant.playerUrl + (params.size ? "?" + params : "");
+    player.value = {
+      url,
+      origin: new URL(grant.playerUrl).origin,
+      item: m,
+      kind,
+      renewalAttempts: restore?.renewalAttempts ?? 0,
+    };
     Object.assign(playbackGate, {
       sessionID: "",
       accumulatedMs: 0,
@@ -172,7 +209,7 @@ export function usePlaybackHost(options: UsePlaybackHostOptions) {
       )
         return;
       const a = availability[`movie:${detail.value.id}`];
-      if (a?.playerUrl) openPlayer(detail.value, a, "movie", false);
+      if (a?.playerUrl) void openPlayer(detail.value, a, "movie", false);
       return;
     }
     if (kind !== "tv") return;
@@ -193,24 +230,42 @@ export function usePlaybackHost(options: UsePlaybackHostOptions) {
           value.season_number === season && value.episode_number === episode,
       );
     const a = item && availability[`episode:${item.id}`];
-    if (a?.playerUrl) openPlayer(item, a, "episode", false);
+    if (a?.playerUrl) void openPlayer(item, a, "episode", false);
   }
   function playDetail() {
     const kind = currentKind.value,
       a = availability[`${kind}:${detail.value.id}`];
-    if (a) openPlayer(detail.value, a, kind);
+    if (a) void openPlayer(detail.value, a, kind);
   }
-  function renditionURL(a: PlaybackAvailability | undefined, quality: string) {
-    return (
-      a?.originalDownloadUrl?.replace(
-        "/download/original",
-        `/download/${quality}`,
-      ) || "#"
-    );
+  async function downloadMedia(
+    m: PlaybackItem,
+    a: PlaybackAvailability | undefined,
+    kind: string,
+    quality = "original",
+  ): Promise<void> {
+    if (!a?.originalDownloadUrl) return;
+    const grant = await playbackGrant(m, kind).catch((reason: unknown) => {
+      flash(reason instanceof Error ? reason.message : "Download unavailable");
+      return null;
+    });
+    if (!grant) return;
+    const href =
+      quality === "original"
+        ? grant.originalDownloadUrl
+        : grant.originalDownloadUrl.replace(
+            "/download/original",
+            `/download/${quality}`,
+          );
+    const link = document.createElement("a");
+    link.href = href;
+    link.rel = "noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   }
   function playEpisode(e: any) {
     const a = availability[`episode:${e.id}`];
-    if (a) openPlayer(e, a, "episode");
+    if (a) void openPlayer(e, a, "episode");
   }
   async function navigateEpisode(direction: "next" | "previous") {
     const p = player.value;
@@ -237,7 +292,7 @@ export function usePlaybackHost(options: UsePlaybackHostOptions) {
       show: result.showName,
     };
     if (result.availability?.available) {
-      openPlayer(next, result.availability, "episode");
+      await openPlayer(next, result.availability, "episode");
     } else {
       closePlayer(false);
       go(
@@ -252,6 +307,20 @@ export function usePlaybackHost(options: UsePlaybackHostOptions) {
   async function onPlayerMessage(e: PlarrEvent) {
     const p = player.value;
     if (!p) return;
+    if (e.type === "authorization-expired") {
+      if (p.renewalAttempts >= 1) {
+        flash("Playback authorization expired");
+        return;
+      }
+      const a = availability[`${p.kind}:${p.item.id}`];
+      if (a) {
+        await openPlayer(p.item, a, p.kind, false, {
+          startSeconds: e.positionSeconds,
+          renewalAttempts: p.renewalAttempts + 1,
+        });
+      }
+      return;
+    }
     const eventRevision = ++playbackEventRevision;
     const now = performance.now();
     if (playbackGate.sessionID !== e.sessionId) {
@@ -325,12 +394,12 @@ export function usePlaybackHost(options: UsePlaybackHostOptions) {
     autoplay,
     cancelAutoplay,
     closePlayer,
+    downloadMedia,
     navigateEpisode,
     onPlayerMessage,
     playDetail,
     playEpisode,
     player,
-    renditionURL,
     restorePlayerFromRoute,
   };
 }

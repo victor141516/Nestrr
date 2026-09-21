@@ -25,27 +25,19 @@ func TestDefaultAccessTokenTTLIsTwoHours(t *testing.T) {
 	}
 }
 
-func TestMediaCookieRequiresSharedHTTPSHosts(t *testing.T) {
+func TestPlaybackAPIKeyRequiresPlarrHost(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("NESTRR_JWT_SECRET", strings.Repeat("s", 32))
 	t.Setenv("NESTRR_DATABASE_PATH", filepath.Join(root, "nestrr.db"))
 	t.Setenv("NESTRR_IMAGE_CACHE_DIR", filepath.Join(root, "images"))
 	t.Setenv("NESTRR_MOVIE_LIBRARY_ROOT", filepath.Join(root, "Movies"))
 	t.Setenv("NESTRR_SHOW_LIBRARY_ROOT", filepath.Join(root, "Shows"))
-	t.Setenv("NESTRR_PUBLIC_ORIGIN", "https://nestrr.example.test")
-	t.Setenv("NESTRR_PLARR_HOST", "https://plarr.example.test")
-	for _, domain := range []string{"test", "attacker.test", "example.test.evil"} {
-		t.Setenv("NESTRR_MEDIA_COOKIE_DOMAIN", domain)
-		if _, err := Load(); err == nil {
-			t.Fatalf("accepted invalid cookie domain %q", domain)
-		}
-	}
-	t.Setenv("NESTRR_MEDIA_COOKIE_DOMAIN", ".example.test")
-	if c, err := Load(); err != nil || c.MediaCookieDomain != "example.test" {
-		t.Fatalf("valid shared domain rejected: %v", err)
-	}
-	t.Setenv("NESTRR_PLARR_HOST", "http://plarr.example.test")
+	t.Setenv("NESTRR_PLARR_API_KEY", "secret")
 	if _, err := Load(); err == nil {
-		t.Fatal("accepted insecure player origin")
+		t.Fatal("accepted a playback API key without a Plarr host")
+	}
+	t.Setenv("NESTRR_PLARR_INTERNAL_HOST", "http://plarr:8090")
+	if c, err := Load(); err != nil || c.PlarrAPIKey != "secret" {
+		t.Fatalf("valid Plarr grant configuration rejected: %v", err)
 	}
 }

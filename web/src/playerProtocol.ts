@@ -16,6 +16,7 @@ export type PlarrEventType =
   | "manual-quality-changed"
   | "next-requested"
   | "previous-requested"
+  | "authorization-expired"
   | "playback-error";
 
 export interface PlarrEvent {
@@ -50,6 +51,7 @@ const eventTypes = new Set<PlarrEventType>([
   "manual-quality-changed",
   "next-requested",
   "previous-requested",
+  "authorization-expired",
   "playback-error",
 ]);
 

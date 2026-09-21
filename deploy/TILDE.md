@@ -28,24 +28,18 @@ Compose and Caddy files, an online Jellyfin database backup, source-to-link
 mapping, TMDB detail snapshots, and Jellyfin user progress. Intermediate
 migration directories are not library roots.
 
-## Public authentication
+## Playback authentication
 
 Insert `tilde.Caddyfile` inside the existing `(services)` snippet, validate
 the complete configuration, then reload Caddy. No additional host ports or
 DNS changes are required by this Compose file.
 
-`NESTRR_MEDIA_COOKIE_DOMAIN=viti.site` enables a separate, Secure, HttpOnly,
-SameSite=Strict media grant at login and access-token refresh. Caddy checks
-that grant before proxying **every** public Plarr request. Unauthenticated
-page navigation returns to Nestrr; media API calls return 401. The grant has
-a distinct JWT audience and cannot authorize Nestrr API operations.
-Only configure a shared cookie domain when all its subdomains are trusted.
-Logout clears the browser grant; copied grants expire with the access TTL.
-
-Internal Plarr calls remain on the Docker network. External clients that
-cannot carry browser cookies, including a standalone Cast receiver, require
-their own supported authentication arrangement; do not bypass the gate
-for media paths to accommodate them.
+Set the same random `PLARR_API_KEY` for Nestrr and Plarr. Nestrr uses the
+Docker-network Plarr origin to exchange this secret for an opaque grant bound
+to one resolved file. Caddy proxies Plarr directly; there is no `forward_auth`
+or shared browser cookie. The player propagates the grant to browser and Cast
+manifest, segment, subtitle, preview, download, and session requests. Leave
+the key empty only when unrestricted standalone Plarr access is intended.
 
 ## AMD and verification
 
