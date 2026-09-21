@@ -45,6 +45,7 @@ const {
   currentAvailability,
   currentKind,
   detailProgress,
+  downloadMedia,
   fmtSeconds,
   forceTorrent,
   forcingTorrents,
@@ -57,7 +58,6 @@ const {
   playDetail,
   refreshDetail,
   rottenTomatoesEnabled,
-  renditionURL,
   t,
   title,
   toggleCustomList,
@@ -320,14 +320,25 @@ function personExploreRoute(
             <summary :aria-label="t('download')" :title="t('download')">
               <AppIcon name="downloadFile" />
             </summary>
-            <a :href="currentAvailability.originalDownloadUrl">Original</a>
-            <a
+            <button
+              @click="downloadMedia(detail, currentAvailability, currentKind)"
+            >
+              Original
+            </button>
+            <button
               v-for="resolution in ['1080p', '720p', '480p', '360p', '240p']"
               :key="resolution"
-              :href="renditionURL(currentAvailability, resolution)"
+              @click="
+                downloadMedia(
+                  detail,
+                  currentAvailability,
+                  currentKind,
+                  resolution,
+                )
+              "
             >
               {{ resolution }} MP4
-            </a>
+            </button>
           </details>
           <button
             v-if="

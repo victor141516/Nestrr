@@ -18,9 +18,9 @@ services:
       NESTRR_MOVIE_LIBRARY_ROOT: /library/Movies
       NESTRR_SHOW_LIBRARY_ROOT: /library/Shows
       NESTRR_PUBLIC_ORIGIN: https://nestrr.viti.site
-      NESTRR_MEDIA_COOKIE_DOMAIN: viti.site
       NESTRR_PLARR_HOST: https://plarr.viti.site
       NESTRR_PLARR_INTERNAL_HOST: http://plarr:8090
+      NESTRR_PLARR_API_KEY: ${PLARR_API_KEY:-}
       NESTRR_JACKETT_HOST: http://jackett:9117
       NESTRR_QBITTORRENT_HOST: http://qbittorrent:8080
       NESTRR_QBITTORRENT_SHOW_CATEGORY: Shows
@@ -51,6 +51,7 @@ services:
       PLARR_HARDWARE_ACCELERATION: amd
       PLARR_PUBLIC_ORIGIN: https://plarr.viti.site
       PLARR_ALLOWED_PARENT_ORIGINS: https://nestrr.viti.site
+      PLARR_API_KEY: ${PLARR_API_KEY:-}
     devices:
       - /dev/dri:/dev/dri
     group_add:

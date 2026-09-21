@@ -4,7 +4,7 @@
 
 `docker-compose.yml` runs Nestrr, Plarr, Jackett, FlareSolverr, qBittorrent, Chiprr, and Strastorr. Clone `Strastorr` alongside `Nestrr`, `chiprr`, and `Plarr` before building. Only Nestrr and Plarr need public browser origins. FlareSolverr has no published host port and is reachable only as `http://flaresolverr:8191` on the Compose network. Jackett and qBittorrent also stay private to the Compose network; their mapped ports are for local administration and may be removed behind another management route.
 
-Nestrr is authenticated. Plarr is intentionally unauthenticated: every valid Plarr media URL can play or download the referenced file. Publish Plarr only where that consequence is acceptable. Use HTTPS for both browser origins. `NESTRR_PUBLIC_ORIGIN` is also the refresh-cookie/CSRF origin, while `PLARR_PUBLIC_ORIGIN` is embedded in player links. `PLARR_ALLOWED_PARENT_ORIGINS` must contain the exact Nestrr origin.
+Nestrr is authenticated. Plarr can optionally require file-scoped playback grants: set the same random `PLARR_API_KEY` value for both services. Nestrr exchanges it server-to-server for a short-lived playback token only when a user starts playback or a download. Leave it empty only when unrestricted standalone Plarr access is intentional. Use HTTPS for both browser origins. `NESTRR_PUBLIC_ORIGIN` is also the refresh-cookie/CSRF origin, while `PLARR_PUBLIC_ORIGIN` is embedded in player links. `PLARR_ALLOWED_PARENT_ORIGINS` must contain the exact Nestrr origin.
 
 The local Tailscale example uses:
 
@@ -48,7 +48,8 @@ Nestrr variables:
 | `NESTRR_OMDB_API_KEY` | none | optional IMDb-ID fallback rating provider |
 | `NESTRR_OMDB_BASE_URL` | OMDb API | upstream/API-test override |
 | `NESTRR_PLARR_HOST` | none | public player origin |
-| `NESTRR_PLARR_INTERNAL_HOST` | public host | private health-check origin |
+| `NESTRR_PLARR_INTERNAL_HOST` | public host | private health-check and grant-issuance origin |
+| `NESTRR_PLARR_API_KEY` | none | shared Plarr grant secret; normally sourced from `PLARR_API_KEY` |
 | `NESTRR_JACKETT_HOST`, `NESTRR_JACKETT_API_KEY` | none | optional Jackett connection |
 | `NESTRR_QBITTORRENT_HOST`, `NESTRR_QBITTORRENT_USERNAME`, `NESTRR_QBITTORRENT_PASSWORD` | none | optional qBittorrent connection |
 | `NESTRR_QBITTORRENT_SHOW_CATEGORY` | `Shows` | default show category |
@@ -68,6 +69,7 @@ Plarr variables:
 | `PLARR_MEDIA_ROOT` | `./media` | realpath-contained media root |
 | `PLARR_PUBLIC_ORIGIN` | `http://localhost:8090` | public player/API origin |
 | `PLARR_ALLOWED_PARENT_ORIGINS` | empty | comma-separated postMessage parents |
+| `PLARR_API_KEY` | none | optional shared secret enabling file-scoped playback grants |
 | `PLARR_CACHE_DIR` | `./cache` | disposable segment/download cache |
 | `PLARR_CACHE_LIMIT` | `10GB` | cold-file eviction ceiling |
 | `PLARR_FFMPEG_PATH`, `PLARR_FFPROBE_PATH` | command names | media binaries |
@@ -126,6 +128,6 @@ Recovery is: restore persistent configuration/database/media, start services, th
 
 ## Initial limitations
 
-Single video files only; no multi-episode/anime/special numbering, sidecar subtitles, personalized ranking, casting, or qBittorrent progress UI. Firefox is best effort. Safari/iPhone use native HLS when available. Public Plarr links are bearer-style path capabilities and are not protected by Nestrr authentication.
+Single video files only; no multi-episode/anime/special numbering or sidecar subtitles. Firefox is best effort. Safari/iPhone use native HLS when available. When playback grants are disabled, direct Plarr paths remain unrestricted bearer-style capabilities.
 
 For the versioned contracts, see [docs/API.md](docs/API.md).

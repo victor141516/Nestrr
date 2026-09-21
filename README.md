@@ -326,14 +326,14 @@ If `PLARR_HOST` is absent or unhealthy:
 - original/transcoded media download controls are hidden;
 - metadata discovery, local availability, users, and optional torrent initiation continue working.
 
-### Public player model
+### Optional playback grants
 
-Plarr is intentionally public and does not use Nestrr authentication, signed URLs, or expiring playback tokens.
+Plarr remains independently usable. When `PLARR_API_KEY` is empty, direct media URLs retain unauthenticated standalone behavior. When it is configured, Nestrr resolves the catalog item to a local file and exchanges the shared secret server-to-server for an opaque, file-scoped playback grant. The API key never reaches the browser.
 
-- A Plarr link containing a media path can be copied and shared with anyone who can reach Plarr.
-- The recipient can play the file independently; shared links do not synchronize playback sessions.
-- Public access applies to playback, the original-file download, and explicitly requested transcoded downloads.
-- Public access never permits uploads, filesystem mutation, or selection of a file outside the configured media root.
+- A new grant must be activated within one minute.
+- Any valid request carrying the grant refreshes its activity; after activity stops it remains valid for one hour.
+- The same grant supports playback, previews, subtitles, downloads, HLS segments, diagnostics, heartbeats, and Google Cast for that file only.
+- Grants are kept only in Plarr memory and are invalidated by restart.
 
 ### Path URL contract
 
@@ -344,8 +344,7 @@ Plarr is intentionally public and does not use Nestrr authentication, signed URL
   https://plarr.example/#/play/<base64url-encoded-relative-path>?start=120&audio=es&subtitles=en&subtitlesEnabled=true
   ```
 
-- Because the fragment is client-side, the SPA converts it into a deterministic public media identifier/API URL.
-- The resulting HLS master-playlist URL is derived from the normalized relative path alone and does not require a signature.
+- Because the fragment is client-side, the SPA converts it into a deterministic media identifier/API URL and propagates an optional grant to every protected request.
 - Plarr validates the path only when media is requested. Deterministic URL construction does not require the file to exist first.
 - `PLARR_MEDIA_ROOT` defines the only filesystem tree Plarr can read.
 - Every request must decode, normalize, resolve, and realpath-check the requested file and ensure it remains under the real configured root. Reject traversal, absolute-path injection, and symlink escapes.
@@ -576,7 +575,7 @@ Impersonation must be explicit, visibly indicated, reversible, and auditable.
 - The SPA should keep access tokens out of persistent JavaScript storage where practical; refresh-token transport/storage must be protected against theft and CSRF according to the selected deployment model.
 - Store passwords with a modern adaptive password hash.
 - Revoke refresh sessions on user deletion, password reset, or explicit administrator action.
-- Plarr does not consume or validate these tokens.
+- Plarr does not consume or validate Nestrr account tokens. Its optional playback grants are separate, file-scoped capabilities created with the server-side shared API key.
 
 ## Jackett and qBittorrent
 
@@ -647,7 +646,7 @@ Every operation used by the Nestrr web SPA belongs to a versioned client API tha
 
 Implementation-only endpoints may remain internal, but an operation cannot be declared internal merely because the first client is the web SPA.
 
-Plarr likewise exposes a public, versioned media API suitable for native clients to request manifests, renditions, tracks, original downloads, and transcoded downloads.
+Plarr likewise exposes a versioned media API suitable for native clients to request manifests, renditions, tracks, original downloads, and transcoded downloads. Clients must obtain a playback grant first when optional Plarr authentication is enabled.
 
 ## Chromecast and AirPlay
 
@@ -657,7 +656,7 @@ The design must keep enough separation to add it later:
 
 - Plarr media URLs are reachable by the receiving device.
 - A future receiver can use adaptive manifests where the platform permits it.
-- Temporary signed URLs may be introduced only if a casting platform requires them; normal public Plarr playback does not require signatures.
+- File-scoped playback grants are included in Cast manifest and subtitle URLs when authentication is enabled.
 - If automatic continuation to the next episode can be maintained on the receiver, do so.
 - Otherwise end the cast session, open the next episode normally on the controlling device, and let the user cast again.
 
@@ -807,7 +806,7 @@ Before an implementation release, deployment documentation must explain:
 - why completed and library roots must share a filesystem;
 - Chiprr watch versus manual execute/recovery mode;
 - canonical movie/show naming and sanitization;
-- public unauthenticated Plarr playback/download implications;
+- optional Plarr playback grants and unrestricted-mode implications;
 - cache directories, volumes, limits, cleanup, backup, and recovery;
 - known initial limitations.
 

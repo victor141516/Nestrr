@@ -7,10 +7,6 @@ handle @nestrr {
 
 @plarr host plarr.viti.site
 handle @plarr {
-	forward_auth nestrr:8080 {
-		uri /api/v1/auth/media-check
-		header_up -Origin
-	}
 	reverse_proxy plarr:8090 {
 		flush_interval -1
 	}

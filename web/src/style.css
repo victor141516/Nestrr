@@ -1085,19 +1085,25 @@ input::placeholder {
 .download-menu[open] summary {
   border-radius: 10px 10px 0 0;
 }
-.download-menu a {
+.download-menu :is(a, button) {
   display: block;
   position: relative;
   z-index: 2;
+  width: 100%;
   min-height: 36px;
   padding: 0.5rem 0.8rem;
+  border-top: 0;
+  border-bottom: 0;
   border-right: 1px solid var(--line);
   border-left: 1px solid var(--line);
+  border-radius: 0;
   background: #111a25;
   color: #dce1e7;
+  font: inherit;
+  text-align: left;
   text-decoration: none;
 }
-.download-menu a:last-child {
+.download-menu :is(a, button):last-child {
   border-bottom: 1px solid var(--line);
   border-radius: 0 0 10px 10px;
 }
@@ -2247,7 +2253,7 @@ html[data-theme="light"] .server-services > div,
 html[data-theme="light"] .torrent-filters,
 html[data-theme="light"] .torrent-results article,
 html[data-theme="light"] .download-menu summary,
-html[data-theme="light"] .download-menu a,
+html[data-theme="light"] .download-menu :is(a, button),
 html[data-theme="light"] .library-list > a.actionable:hover,
 html[data-theme="light"] .library-title span,
 html[data-theme="light"] .custom-list-menu > div,
