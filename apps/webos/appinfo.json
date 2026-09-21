@@ -1,0 +1,13 @@
+{
+  "id": "site.viti.nestrr.smoke",
+  "version": "0.0.1",
+  "vendor": "Nestrr",
+  "type": "web",
+  "main": "index.html",
+  "title": "Nestrr Test",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "resolution": "1920x1080",
+  "requiredACG": [],
+  "disableBackHistoryAPI": true
+}

@@ -1,0 +1,12 @@
+/* Opt-in remote focus. Reuse the existing layout and accent. */
+.television :focus {
+  outline: 3px solid var(--accent, #a78bfa) !important;
+  outline-offset: 4px;
+  scroll-margin: 32px;
+}
+.television .media-card:focus .card-play {
+  opacity: 1;
+}
+.television .player-frame:focus {
+  outline: none !important;
+}

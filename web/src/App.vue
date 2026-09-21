@@ -6,12 +6,14 @@ import AppIcon from "./AppIcon.vue";
 import AuthView from "./AuthView.vue";
 import EmbeddedPlayer from "./EmbeddedPlayer.vue";
 import TorrentSearchModal from "./TorrentSearchModal.vue";
+import { useTelevisionNavigation } from "./useTelevisionNavigation";
 import {
   nestrrApplicationKey,
   useNestrrApplication,
 } from "./useNestrrApplication";
 
 const application = useNestrrApplication();
+const { television } = useTelevisionNavigation(application);
 provide(nestrrApplicationKey, application);
 const {
   adminAction,
@@ -69,6 +71,7 @@ const {
       v-if="player"
       :url="player.url"
       :origin="player.origin"
+      :television="television"
       :autoplay-seconds="autoplay?.seconds"
       :labels="{
         upNext: t('upNext'),

@@ -4,6 +4,8 @@ Nestrr is a self-hosted movie and TV catalog designed as a focused alternative t
 
 Playback and transcoding are deliberately delegated to [Plarr](https://github.com/victor141516/Plarr), a separate standalone web player. Downloaded files are normalized by [Chiprr](https://github.com/victor141516/chiprr), which remains independent from both Nestrr and Plarr.
 
+[Strastorr](https://github.com/victor141516/Strastorr) extracts newly added archives in the completed-download directories before Chiprr organizes their videos. Clone Strastorr alongside Nestrr and Chiprr to use the Compose stack. Existing archives are ignored at startup, originals are retained, and conflicting destinations are never overwritten. Recursive archive bombs are intentionally not prevented; see Strastorr's README before feeding untrusted archives.
+
 ## Quick start
 
 Copy `.env.example` to `.env`, configure the required secrets and TMDB token, then start the stack.

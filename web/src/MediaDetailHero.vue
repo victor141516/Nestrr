@@ -301,6 +301,7 @@ function personExploreRoute(
           <button
             v-if="integrations.plarr?.healthy && currentAvailability?.playerUrl"
             class="primary icon-action"
+            data-tv-play
             :aria-label="
               detailProgress?.resumeSeconds ? t('resume') : t('play')
             "

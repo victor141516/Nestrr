@@ -1,11 +1,20 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, useTemplateRef } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  onUnmounted,
+  useTemplateRef,
+} from "vue";
+import { televisionPlayerURL } from "./television";
 import AppIcon from "./AppIcon.vue";
 import { isPlarrEvent, type PlarrEvent } from "./playerProtocol";
 
 const props = defineProps<{
   url: string;
   origin: string;
+  television?: boolean;
   autoplaySeconds?: number;
   labels: {
     upNext: string;
@@ -22,6 +31,17 @@ const emit = defineEmits<{
 }>();
 
 const frame = useTemplateRef<HTMLIFrameElement>("frame");
+const playerURL = computed(() =>
+  props.television ? televisionPlayerURL(props.url) : props.url,
+);
+const opener = document.activeElement as HTMLElement | null;
+function focusPlayer() {
+  if (props.television) frame.value?.focus();
+}
+onUnmounted(() => {
+  if (props.television)
+    void nextTick(() => opener?.isConnected && opener.focus());
+});
 
 function onMessage(event: MessageEvent<unknown>): void {
   if (
@@ -40,10 +60,12 @@ onBeforeUnmount(() => window.removeEventListener("message", onMessage));
 <template>
   <div class="player-overlay">
     <iframe
-      :key="url"
+      :key="playerURL"
       ref="frame"
       class="player-frame"
-      :src="url"
+      :src="playerURL"
+      title="Plarr"
+      @load="focusPlayer"
       allow="autoplay; fullscreen; picture-in-picture"
       allowfullscreen
     />

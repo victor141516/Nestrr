@@ -2,7 +2,7 @@
 
 ## Topology and origins
 
-`docker-compose.yml` runs Nestrr, Plarr, Jackett, FlareSolverr, qBittorrent, and Chiprr. Only Nestrr and Plarr need public browser origins. FlareSolverr has no published host port and is reachable only as `http://flaresolverr:8191` on the Compose network. Jackett and qBittorrent also stay private to the Compose network; their mapped ports are for local administration and may be removed behind another management route.
+`docker-compose.yml` runs Nestrr, Plarr, Jackett, FlareSolverr, qBittorrent, Chiprr, and Strastorr. Clone `Strastorr` alongside `Nestrr`, `chiprr`, and `Plarr` before building. Only Nestrr and Plarr need public browser origins. FlareSolverr has no published host port and is reachable only as `http://flaresolverr:8191` on the Compose network. Jackett and qBittorrent also stay private to the Compose network; their mapped ports are for local administration and may be removed behind another management route.
 
 Nestrr is authenticated. Plarr is intentionally unauthenticated: every valid Plarr media URL can play or download the referenced file. Publish Plarr only where that consequence is acceptable. Use HTTPS for both browser origins. `NESTRR_PUBLIC_ORIGIN` is also the refresh-cookie/CSRF origin, while `PLARR_PUBLIC_ORIGIN` is embedded in player links. `PLARR_ALLOWED_PARENT_ORIGINS` must contain the exact Nestrr origin.
 
@@ -104,6 +104,8 @@ services:
 Use `PLARR_HARDWARE_ACCELERATION=intel` for QSV/VAAPI or `amd` for VAAPI. If initialization fails, Plarr logs the failed backend and retries with CPU.
 
 ## qBittorrent and Chiprr filesystem contract
+
+Strastorr watches the same completed Movies/Shows roots and extracts newly added archives in place. It preserves originals and volumes, rejects conflicting destinations, and processes one extraction at a time. It has no ports or API integration. Start the watchers before adding downloads; pre-existing archives are ignored, including after restart. `STRASTORR_POLL_INTERVAL` defaults to two seconds and `STRASTORR_LOG_LEVEL` to `INFO`. Match `PUID`/`PGID` to writable host directories. No archive-bomb limits are implemented: recursive expansion can exhaust resources. See Strastorr's README for its full safety contract.
 
 Incomplete downloads must stay outside Chiprr's watched completed directories. qBittorrent moves finished data into the selected category path. Chiprr watches the two completed roots and creates canonical hard links:
 

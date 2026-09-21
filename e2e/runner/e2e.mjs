@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdir, stat } from "node:fs/promises";
 import { chromium } from "playwright";
+import { televisionSmoke } from "./television-smoke.mjs";
 
 const nestrr = process.env.NESTRR_URL || "http://nestrr:8080";
 const jackett = process.env.JACKETT_MOCK_URL || "http://mock-jackett:9117";
@@ -582,10 +583,13 @@ try {
     [],
     `browser errors: ${relevantErrors.join(" | ")}`,
   );
+  console.log("[e2e] TV login, movie, playback, LG Back and restored focus");
+  const television = await televisionSmoke(browser, nestrr, artifacts);
   console.log(
     JSON.stringify(
       {
         result: "PASS",
+        television,
         moviesRendered: 3,
         jackettSearches: jackettState.searches,
         qbittorrentAccepted: qbState.accepted,

@@ -10,6 +10,7 @@ import type { RouteLocationNormalizedLoaded, Router } from "vue-router";
 import { api, session } from "./api";
 import type { TranslationKey } from "./i18n";
 import { preferredAudioLanguage } from "./mediaPreferences";
+import { episodeNavigationCapabilities } from "./episodeNavigation";
 import {
   playbackQuery,
   playbackRequested,
@@ -136,6 +137,11 @@ export function usePlaybackHost(options: UsePlaybackHostOptions) {
     if (pref?.subtitleLanguage) params.set("subtitles", pref.subtitleLanguage);
     if (pref?.subtitlesEnabled) params.set("subtitlesEnabled", "true");
     params.set("contentId", `${kind}:${m.id}`);
+    if (kind === "episode") {
+      const navigation = episodeNavigationCapabilities(detail.value, m);
+      params.set("hasPrevious", navigation.hasPrevious ? "1" : "0");
+      params.set("hasNext", navigation.hasNext ? "1" : "0");
+    }
     const catalogTitle =
       kind === "episode" ? (m as any).show || title(m) : title(m);
     if (catalogTitle) params.set("title", catalogTitle);

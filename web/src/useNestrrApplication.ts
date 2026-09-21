@@ -221,6 +221,7 @@ export function useNestrrApplication() {
   const {
     autoplay,
     cancelAutoplay,
+    closePlayer,
     navigateEpisode,
     onPlayerMessage,
     playDetail,
@@ -439,6 +440,7 @@ export function useNestrrApplication() {
     changeExploreSort,
     checkCards,
     clearMetadata,
+    closePlayer,
     confirmAdminAction,
     confirmMetadata,
     continueItems,

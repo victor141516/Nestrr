@@ -122,6 +122,20 @@ services:
       - ./.runtime/qbittorrent:/config
       - ./.runtime/data/downloads:/downloads
 
+  strastorr:
+    build: ../Strastorr
+    restart: unless-stopped
+    init: true
+    user: "${PUID:-1000}:${PGID:-1000}"
+    depends_on:
+      chiprr: { condition: service_started }
+    environment:
+      WATCH_DIRECTORIES: '["/downloads/Movies", "/downloads/Shows"]'
+      POLL_INTERVAL: ${STRASTORR_POLL_INTERVAL:-2}
+      LOG_LEVEL: ${STRASTORR_LOG_LEVEL:-INFO}
+    volumes:
+      - ./.runtime/data/downloads/completed:/downloads
+
   chiprr:
     build: ../chiprr
     restart: unless-stopped
