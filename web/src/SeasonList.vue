@@ -17,6 +17,7 @@ const {
   openTorrent,
   percent,
   playEpisode,
+  createWatchParty,
   progressFor,
   setEpisodeWatched,
   setSeasonWatched,
@@ -232,6 +233,13 @@ const {
                 >
                   <AppIcon name="play" />
                 </button>
+                <button
+                  v-if="integrations.plarr?.healthy && availability[`episode:${episode.id}`]?.available"
+                  class="secondary icon-action"
+                  :aria-label="t('watchParty')"
+                  :title="t('watchParty')"
+                  @click="createWatchParty({ ...episode, show: detail.name, showId: detail.id, showOriginalName: detail.original_name, showOriginalLanguage: detail.original_language }, 'episode')"
+                ><AppIcon name="users" /></button>
                 <button
                   v-if="
                     integrations.jackett?.healthy &&

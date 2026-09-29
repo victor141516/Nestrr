@@ -98,6 +98,7 @@ func (s *Server) Handler() http.Handler {
 		r.Get("/api/v1/progress/{kind}/{id}", s.getProgress)
 		r.Post("/api/v1/playback/events", s.playbackEvent)
 		r.Post("/api/v1/playback/grant", s.playbackGrant)
+		r.Post("/api/v1/playback/rooms", s.createPlaybackRoom)
 		r.Post("/api/v1/playback/navigation", s.playbackNavigation)
 		r.Post("/api/v1/progress/{kind}/{id}/watched", s.setWatched)
 		r.Post("/api/v1/progress/episodes/watched", s.setEpisodesWatched)
