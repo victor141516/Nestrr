@@ -56,6 +56,7 @@ const {
   membershipsFor,
   openTorrent,
   playDetail,
+  createWatchParty,
   refreshDetail,
   rottenTomatoesEnabled,
   t,
@@ -310,6 +311,13 @@ function personExploreRoute(
           >
             <AppIcon name="play" />
           </button>
+          <button
+            v-if="currentKind === 'movie' && integrations.plarr?.healthy && currentAvailability?.playerUrl"
+            class="secondary icon-action"
+            :aria-label="t('watchParty')"
+            :title="t('watchParty')"
+            @click="createWatchParty(detail, 'movie')"
+          ><AppIcon name="users" /></button>
           <details
             v-if="
               integrations.plarr?.healthy &&

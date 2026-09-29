@@ -8,7 +8,7 @@ import {
   type InjectionKey,
 } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { artwork, session } from "./api";
+import { api, artwork, session } from "./api";
 import { tr, type TranslationKey } from "./i18n";
 import { episodeImagePath } from "./episodeArtwork";
 import { ACCENT_COLORS } from "./theme";
@@ -324,6 +324,26 @@ export function useNestrrApplication() {
     toast.value = message;
     setTimeout(() => (toast.value = ""), 3000);
   }
+  async function createWatchParty(media: any, kind: string) {
+    const tab = window.open("", "_blank");
+    if (tab) tab.opener = null;
+    try {
+      const room = await api<{ roomId: string; playerUrl: string }>(
+        "/playback/rooms",
+        { method: "POST", body: JSON.stringify(mediaInput(media, kind)) },
+      );
+      if (tab) tab.location.href = room.playerUrl;
+      try {
+        await navigator.clipboard.writeText(room.playerUrl);
+        flash(t("watchPartyLinkCopied"));
+      } catch {
+        window.prompt(t("watchPartyShareLink"), room.playerUrl);
+      }
+    } catch (error) {
+      tab?.close();
+      flash(error instanceof Error ? error.message : t("watchParty"));
+    }
+  }
   function percent(p: any) {
     return Math.max(
       0,
@@ -505,6 +525,7 @@ export function useNestrrApplication() {
     pendingRemovalFor,
     percent,
     playDetail,
+    createWatchParty,
     playEpisode,
     player,
     progressFor,
