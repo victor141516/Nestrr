@@ -66,7 +66,7 @@ onBeforeUnmount(() => window.removeEventListener("message", onMessage));
       :src="playerURL"
       title="Plarr"
       @load="focusPlayer"
-      allow="autoplay; fullscreen; picture-in-picture"
+      allow="autoplay; fullscreen; picture-in-picture; clipboard-write"
       allowfullscreen
     />
     <div v-if="autoplaySeconds !== undefined" class="autoplay">
