@@ -10,6 +10,7 @@ import type { RouteLocationNormalizedLoaded, Router } from "vue-router";
 import { api, session } from "./api";
 import type { TranslationKey } from "./i18n";
 import { preferredAudioLanguage } from "./mediaPreferences";
+import { playbackPlayerURL } from "./playbackPlayerURL";
 import { episodeNavigationCapabilities } from "./episodeNavigation";
 import {
   playbackQuery,
@@ -134,6 +135,92 @@ export function usePlaybackHost(options: UsePlaybackHostOptions) {
       body: JSON.stringify(mediaInput(m, kind)),
     });
   }
+  function playerContext(m: PlaybackItem, kind: string) {
+    const pref = progress.value.find(
+      (p) => p.mediaType === kind && p.tmdbId === m.id,
+    );
+    const params = new URLSearchParams();
+    const audio = preferredAudioLanguage(
+      pref?.audioLanguage,
+      session.user?.language,
+    );
+    if (audio) params.set("audio", audio);
+    if (pref?.subtitleLanguage) params.set("subtitles", pref.subtitleLanguage);
+    if (pref?.subtitlesEnabled) params.set("subtitlesEnabled", "true");
+    params.set("contentId", `${kind}:${m.id}`);
+    if (kind === "episode") {
+      const navigation = episodeNavigationCapabilities(detail.value, m);
+      params.set("hasPrevious", navigation.hasPrevious ? "1" : "0");
+      params.set("hasNext", navigation.hasNext ? "1" : "0");
+    }
+    const catalogTitle =
+      kind === "episode" ? (m as any).show || title(m) : title(m);
+    if (catalogTitle) params.set("title", catalogTitle);
+    params.set("parentOrigin", location.origin);
+    return { params, pref };
+  }
+  function showPlayer(
+    m: PlaybackItem,
+    kind: string,
+    playerUrl: string,
+    params: URLSearchParams,
+    pref: any,
+    renewalAttempts = 0,
+  ) {
+    player.value = {
+      url: playbackPlayerURL(playerUrl, params),
+      origin: new URL(playerUrl).origin,
+      item: m,
+      kind,
+      renewalAttempts,
+    };
+    Object.assign(playbackGate, {
+      sessionID: "",
+      accumulatedMs: 0,
+      lastAt: 0,
+      playing: false,
+      qualified: Boolean(pref?.started),
+      hadProgress: Boolean(pref?.started),
+    });
+  }
+  function watchPartyStorageKey(roomId: string) {
+    return `nestrr:watch-party:${roomId}`;
+  }
+  function showWatchPartyPlayer(
+    m: PlaybackItem,
+    kind: string,
+    playerUrl: string,
+    roomId: string,
+    syncRoute: boolean,
+  ) {
+    const { params, pref } = playerContext(m, kind);
+    showPlayer(m, kind, playerUrl, params, pref);
+    if (syncRoute) {
+      const target = playerRoute(m, kind);
+      void router.push({
+        ...target,
+        query: { ...target.query, room: roomId },
+      });
+    }
+  }
+  async function createWatchParty(m: PlaybackItem, kind: string) {
+    const revision = ++playerOpenRevision;
+    try {
+      const room = await api<{ roomId: string; playerUrl: string }>(
+        "/playback/rooms",
+        { method: "POST", body: JSON.stringify(mediaInput(m, kind)) },
+      );
+      if (revision !== playerOpenRevision) return;
+      try {
+        sessionStorage.setItem(watchPartyStorageKey(room.roomId), room.playerUrl);
+      } catch {
+        // Playback can still proceed if browser storage is unavailable.
+      }
+      showWatchPartyPlayer(m, kind, room.playerUrl, room.roomId, true);
+    } catch (error) {
+      flash(error instanceof Error ? error.message : t("watchParty"));
+    }
+  }
   async function openPlayer(
     m: PlaybackItem,
     a: PlaybackAvailability,
@@ -152,47 +239,11 @@ export function usePlaybackHost(options: UsePlaybackHostOptions) {
     });
     if (pendingPlayerKey === requestKey) pendingPlayerKey = "";
     if (!grant || revision !== playerOpenRevision) return;
-    const pref = progress.value.find(
-      (p) => p.mediaType === kind && p.tmdbId === m.id,
-    );
-    const params = new URLSearchParams();
+    const { params, pref } = playerContext(m, kind);
     const startSeconds = restore?.startSeconds ?? pref?.resumeSeconds;
     if (startSeconds) params.set("start", String(startSeconds));
-    const audio = preferredAudioLanguage(
-      pref?.audioLanguage,
-      session.user?.language,
-    );
-    if (audio) params.set("audio", audio);
-    if (pref?.subtitleLanguage) params.set("subtitles", pref.subtitleLanguage);
-    if (pref?.subtitlesEnabled) params.set("subtitlesEnabled", "true");
-    params.set("contentId", `${kind}:${m.id}`);
-    if (kind === "episode") {
-      const navigation = episodeNavigationCapabilities(detail.value, m);
-      params.set("hasPrevious", navigation.hasPrevious ? "1" : "0");
-      params.set("hasNext", navigation.hasNext ? "1" : "0");
-    }
-    const catalogTitle =
-      kind === "episode" ? (m as any).show || title(m) : title(m);
-    if (catalogTitle) params.set("title", catalogTitle);
-    params.set("parentOrigin", location.origin);
-    if (grant.playbackToken)
-      params.set("playbackToken", grant.playbackToken);
-    const url = grant.playerUrl + (params.size ? "?" + params : "");
-    player.value = {
-      url,
-      origin: new URL(grant.playerUrl).origin,
-      item: m,
-      kind,
-      renewalAttempts: restore?.renewalAttempts ?? 0,
-    };
-    Object.assign(playbackGate, {
-      sessionID: "",
-      accumulatedMs: 0,
-      lastAt: 0,
-      playing: false,
-      qualified: Boolean(pref?.started),
-      hadProgress: Boolean(pref?.started),
-    });
+    if (grant.playbackToken) params.set("playbackToken", grant.playbackToken);
+    showPlayer(m, kind, grant.playerUrl, params, pref, restore?.renewalAttempts);
     if (syncRoute) {
       const target = playerRoute(m, kind);
       if (wantsPlayback.value) void router.replace(target);
@@ -202,6 +253,44 @@ export function usePlaybackHost(options: UsePlaybackHostOptions) {
   function restorePlayerFromRoute() {
     if (!wantsPlayback.value || !detail.value) return;
     const kind = currentKind.value;
+    const roomId = queryString(currentRoute.query.room as any);
+    if (roomId) {
+      const season = Number(queryString(currentRoute.query.season as any));
+      const episode = Number(queryString(currentRoute.query.episode as any));
+      const item =
+        kind === "movie"
+          ? detail.value
+          : (detail.value.seasons || [])
+              .flatMap((value: any) => value._episodes || [])
+              .find(
+                (value: any) =>
+                  value.season_number === season &&
+                  value.episode_number === episode,
+              );
+      if (!item) return;
+      const open = player.value;
+      if (open && open.item.id === item.id && open.url.includes(`room=${roomId}`))
+        return;
+      let playerUrl: string | null = null;
+      try {
+        playerUrl = sessionStorage.getItem(watchPartyStorageKey(roomId));
+      } catch {
+        // Browser storage may be unavailable.
+      }
+      if (playerUrl)
+        showWatchPartyPlayer(
+          item,
+          kind === "movie" ? "movie" : "episode",
+          playerUrl,
+          roomId,
+          false,
+        );
+      else {
+        flash(t("unavailable"));
+        closePlayer();
+      }
+      return;
+    }
     if (kind === "movie") {
       if (
         player.value?.kind === "movie" &&
@@ -394,6 +483,7 @@ export function usePlaybackHost(options: UsePlaybackHostOptions) {
     autoplay,
     cancelAutoplay,
     closePlayer,
+    createWatchParty,
     downloadMedia,
     navigateEpisode,
     onPlayerMessage,
