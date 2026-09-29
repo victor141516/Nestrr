@@ -13,6 +13,7 @@ export function playbackRequested(query: RouteQuery): boolean {
 export function withoutPlayback(query: RouteQuery): RouteQuery {
   const next = { ...query };
   delete next.play;
+  delete next.room;
   return next;
 }
 
@@ -25,6 +26,7 @@ export function playbackQuery(
   kind: string,
 ): RouteQuery {
   const next: RouteQuery = { ...query, play: "1" };
+  delete next.room;
   if (kind === "episode") {
     next.season = String(item.season_number || "");
     next.episode = String(item.episode_number || "");
